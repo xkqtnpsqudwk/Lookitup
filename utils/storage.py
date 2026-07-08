@@ -42,6 +42,14 @@ def load_source_packs() -> list[dict[str, Any]]:
     return _read_json_list(SOURCE_PACKS_PATH)
 
 
+def save_source_packs(packs: list[dict[str, Any]]) -> None:
+    ensure_data_files()
+    SOURCE_PACKS_PATH.write_text(
+        json.dumps(packs, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
 def save_sources(sources: list[dict[str, Any]]) -> None:
     ensure_data_files()
     TRUSTED_SOURCES_PATH.write_text(

@@ -54,11 +54,48 @@ pip install -r requirements.txt
 
 ## Run
 
+Frontend prototype:
+
 ```bash
 python -m streamlit run app.py
 ```
 
+Backend API:
+
+```bash
+python -m uvicorn backend.main:app --reload --port 8000
+```
+
 The app runs locally and stores added sources in `data/trusted_sources.json`.
+
+## Backend API
+
+```text
+GET  /health
+GET  /source-packs
+POST /source-packs
+GET  /sources
+POST /sources/url
+POST /sources/rss
+POST /sources/local
+POST /search
+POST /evidence/group
+POST /evidence/summary
+```
+
+Example search request:
+
+```bash
+curl -X POST http://localhost:8000/search ^
+  -H "Content-Type: application/json" ^
+  -d "{\"query\":\"Iran Israel rockets\",\"source_pack_id\":\"international-breaking-news\"}"
+```
+
+OpenAPI docs are available at:
+
+```text
+http://localhost:8000/docs
+```
 
 ## Demo Queries
 
