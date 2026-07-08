@@ -46,6 +46,33 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  uploadPdf: async (file: File, name: string): Promise<Source> => {
+    const form = new FormData();
+    form.append("file", file);
+    if (name) form.append("name", name);
+
+    let response: Response;
+    try {
+      // No Content-Type header: the browser sets the multipart boundary itself.
+      response = await fetch(`${API_BASE}/sources/pdf`, { method: "POST", body: form });
+    } catch {
+      throw new Error(
+        "Backend is not reachable. Start FastAPI with: uvicorn main:app --reload",
+      );
+    }
+    if (!response.ok) {
+      let detail = `Upload failed (${response.status}).`;
+      try {
+        const body = await response.json();
+        if (body?.detail) detail = body.detail;
+      } catch {
+        /* keep default */
+      }
+      throw new Error(detail);
+    }
+    return (await response.json()) as Source;
+  },
+
   clearSources: () =>
     request<{ status: string; removed: number }>("/sources", {
       method: "DELETE",

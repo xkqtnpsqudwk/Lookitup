@@ -4,19 +4,23 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-SourceType = Literal["rss", "website", "manual"]
+# Stored / returned source types. PDF sources exist too, but they are created
+# through the file-upload endpoint, not the JSON POST /sources endpoint.
+SourceType = Literal["rss", "website", "manual", "pdf"]
+CreatableType = Literal["rss", "website", "manual"]
 SortOption = Literal["relevance", "newest"]
 
 
 class SourceCreate(BaseModel):
-    """Payload for POST /sources.
+    """Payload for POST /sources (JSON sources only).
 
     - rss / website require ``url``.
     - manual requires ``content``.
+    PDF sources are added via POST /sources/pdf (multipart file upload).
     """
 
     name: str = Field(default="", description="Display name for the trusted source.")
-    type: SourceType
+    type: CreatableType
     url: str = Field(default="", description="RSS or website URL.")
     content: str = Field(default="", description="Raw text for a manual source.")
 

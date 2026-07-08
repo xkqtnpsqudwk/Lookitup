@@ -82,6 +82,34 @@ def add_source(payload: SourceCreate) -> SourceOut:
     return SourceOut(**_to_out(record))
 
 
+def add_pdf_source(file_bytes: bytes, file_name: str, name: str = "") -> SourceOut:
+    display_name = name.strip() or file_name.strip()
+    if not display_name:
+        raise SourceError("A PDF source needs a name or file name.")
+    if display_name.lower() in _existing_names():
+        raise SourceError(f'A source named "{display_name}" already exists.')
+
+    try:
+        # Let the item title come from the PDF's own metadata / file name,
+        # while ``display_name`` stays the source (outlet) name.
+        items = extractor_service.extract_pdf(file_bytes, file_name)
+    except extractor_service.ExtractionError as exc:
+        raise SourceError(str(exc)) from exc
+
+    record = {
+        "id": _new_id(),
+        "name": display_name,
+        "type": "pdf",
+        "url": "",
+        "created_at": _now_iso(),
+        "items": items,
+    }
+    sources = storage_service.load_sources()
+    sources.append(record)
+    storage_service.save_sources(sources)
+    return SourceOut(**_to_out(record))
+
+
 def delete_all_sources() -> int:
     removed = len(storage_service.load_sources())
     storage_service.save_sources([])

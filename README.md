@@ -23,7 +23,7 @@ only those sources.
 
 The minimum flow, and the whole point of this MVP:
 
-1. **Add trusted sources** — RSS feed, website, or manual text.
+1. **Add trusted sources** — RSS feed, website, manual text, or PDF upload.
 2. **Search inside those trusted sources** — keyword search, never the open web.
 3. **Show trusted results** — as Trusted Result Cards.
 
@@ -34,7 +34,8 @@ No login, no accounts, no crawler, no universal fact-checker, no AI-for-every-qu
 - **Frontend:** React, Vite, TypeScript, plain CSS.
 - **Backend:** FastAPI, Python, Uvicorn, Pydantic.
 - **Storage:** local JSON files (`backend/data/`).
-- **Extraction:** `feedparser` (RSS), `requests` + `BeautifulSoup` (websites).
+- **Extraction:** `feedparser` (RSS), `requests` + `BeautifulSoup` (websites),
+  `PyMuPDF` (PDF text).
 
 ## Project structure
 
@@ -90,7 +91,8 @@ excerpts, match counts, and relevance scores.
 ```text
 GET    /health                 → {"status": "ok"}
 GET    /sources                → list of trusted sources
-POST   /sources                → add an rss / website / manual source
+POST   /sources                → add an rss / website / manual source (JSON)
+POST   /sources/pdf            → add a PDF source (multipart file upload)
 DELETE /sources                → clear all sources (reset demo)
 POST   /sources/load-samples   → load backend/data/sample_sources.json
 GET    /search?q=...&sort=...  → search (sort: relevance | newest)
@@ -104,6 +106,7 @@ GET    /search?q=...&sort=...  → search (sort: relevance | newest)
 - **No result found does not mean the claim is false.**
 - **Lookitup does not search the open web by default.**
 - Website extraction may fail on pages that block requests or render with JavaScript.
+- PDF extraction reads text-based PDFs only; scanned/image-only PDFs would need OCR (out of scope).
 - Search is keyword-based; it does not understand meaning or synonyms.
 
 ## Future extensions
@@ -113,6 +116,6 @@ Treated as out of scope for this MVP, but natural next steps:
 - Optional AI summary generated **from the trusted results only**.
 - Image EXIF metadata tab and image flagging.
 - Archive.org article-version comparison.
-- PDF upload (text extraction via PyMuPDF / pdfplumber).
+- OCR for scanned/image-only PDFs.
 - Source diversity indicator.
 - C2PA / SynthID-related checks if reliable tooling becomes available.

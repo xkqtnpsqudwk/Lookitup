@@ -1,45 +1,64 @@
 import { FormEvent, useState } from "react";
-import type { SourceCreate, SourceType } from "../types";
+import type { CreatableType, SourceCreate, SourceType } from "../types";
 
 interface SourceFormProps {
   onAdd: (payload: SourceCreate) => Promise<void>;
+  onAddPdf: (file: File, name: string) => Promise<void>;
   busy: boolean;
 }
 
-export default function SourceForm({ onAdd, busy }: SourceFormProps) {
+export default function SourceForm({ onAdd, onAddPdf, busy }: SourceFormProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState<SourceType>("rss");
   const [url, setUrl] = useState("");
   const [content, setContent] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [fileKey, setFileKey] = useState(0);
   const [localError, setLocalError] = useState("");
+
+  function reset() {
+    setName("");
+    setUrl("");
+    setContent("");
+    setFile(null);
+    setFileKey((key) => key + 1);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLocalError("");
 
-    if (!name.trim() && type === "manual") {
-      setLocalError("Give the manual source a name.");
-      return;
-    }
-    if ((type === "rss" || type === "website") && !url.trim()) {
-      setLocalError("Enter a URL for an RSS or website source.");
-      return;
-    }
-    if (type === "manual" && !content.trim()) {
-      setLocalError("Manual text cannot be empty.");
-      return;
-    }
-
     try {
+      if (type === "pdf") {
+        if (!file) {
+          setLocalError("Choose a PDF file to upload.");
+          return;
+        }
+        await onAddPdf(file, name.trim());
+        reset();
+        return;
+      }
+
+      if (!name.trim() && type === "manual") {
+        setLocalError("Give the manual source a name.");
+        return;
+      }
+      if ((type === "rss" || type === "website") && !url.trim()) {
+        setLocalError("Enter a URL for an RSS or website source.");
+        return;
+      }
+      if (type === "manual" && !content.trim()) {
+        setLocalError("Manual text cannot be empty.");
+        return;
+      }
+
       await onAdd({
         name: name.trim(),
-        type,
+        type: type as CreatableType,
         url: url.trim(),
         content: content.trim(),
       });
-      setName("");
-      setUrl("");
-      setContent("");
+      reset();
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Could not add source.");
     }
@@ -48,7 +67,7 @@ export default function SourceForm({ onAdd, busy }: SourceFormProps) {
   return (
     <form className="sourceForm" onSubmit={handleSubmit}>
       <label>
-        Source name
+        Source name{type === "pdf" ? " (optional)" : ""}
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -62,10 +81,11 @@ export default function SourceForm({ onAdd, busy }: SourceFormProps) {
           <option value="rss">RSS feed</option>
           <option value="website">Website</option>
           <option value="manual">Manual text</option>
+          <option value="pdf">PDF upload</option>
         </select>
       </label>
 
-      {type === "manual" ? (
+      {type === "manual" && (
         <label>
           Text content
           <textarea
@@ -75,7 +95,21 @@ export default function SourceForm({ onAdd, busy }: SourceFormProps) {
             rows={4}
           />
         </label>
-      ) : (
+      )}
+
+      {type === "pdf" && (
+        <label>
+          PDF file
+          <input
+            key={fileKey}
+            type="file"
+            accept="application/pdf,.pdf"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      )}
+
+      {(type === "rss" || type === "website") && (
         <label>
           {type === "rss" ? "RSS feed URL" : "Website URL"}
           <input
@@ -89,7 +123,7 @@ export default function SourceForm({ onAdd, busy }: SourceFormProps) {
       {localError && <p className="formError">{localError}</p>}
 
       <button type="submit" className="primaryBtn" disabled={busy}>
-        {busy ? "Adding..." : "Add source"}
+        {busy ? "Adding..." : type === "pdf" ? "Upload PDF" : "Add source"}
       </button>
     </form>
   );

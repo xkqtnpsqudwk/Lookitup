@@ -1,4 +1,7 @@
-export type SourceType = "rss" | "website" | "manual";
+export type SourceType = "rss" | "website" | "manual" | "pdf";
+
+// PDF sources are created via file upload, not the JSON create form.
+export type CreatableType = "rss" | "website" | "manual";
 
 export type SortOption = "relevance" | "newest";
 
@@ -13,7 +16,7 @@ export interface Source {
 
 export interface SourceCreate {
   name: string;
-  type: SourceType;
+  type: CreatableType;
   url?: string;
   content?: string;
 }

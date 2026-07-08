@@ -9,7 +9,7 @@ Run with::
 
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.schemas import (
@@ -54,6 +54,22 @@ def get_sources() -> list[dict]:
 def add_source(payload: SourceCreate) -> SourceOut:
     try:
         return source_service.add_source(payload)
+    except source_service.SourceError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/sources/pdf", response_model=SourceOut, status_code=201)
+async def add_pdf_source(
+    file: UploadFile = File(...),
+    name: str = Form(default=""),
+) -> SourceOut:
+    if file.content_type not in ("application/pdf", "application/octet-stream") and not (
+        file.filename or ""
+    ).lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Please upload a PDF file.")
+    file_bytes = await file.read()
+    try:
+        return source_service.add_pdf_source(file_bytes, file.filename or "document.pdf", name)
     except source_service.SourceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

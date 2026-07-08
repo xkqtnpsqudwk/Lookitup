@@ -9,6 +9,7 @@ const TYPE_LABELS: Record<SearchResult["source_type"], string> = {
   rss: "RSS feed",
   website: "Website",
   manual: "Manual text",
+  pdf: "PDF",
 };
 
 function formatDate(timestamp: string | null): string {

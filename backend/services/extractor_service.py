@@ -11,6 +11,7 @@ from email.utils import parsedate_to_datetime
 from typing import Any
 
 import feedparser
+import fitz  # PyMuPDF
 import requests
 from bs4 import BeautifulSoup
 
@@ -105,6 +106,55 @@ def extract_website(url: str) -> list[dict[str, Any]]:
             "title": title or url,
             "url": url,
             "timestamp": normalize_timestamp(datetime.now(timezone.utc)),
+            "content": text,
+        }
+    ]
+
+
+def _parse_pdf_date(raw: str | None) -> str | None:
+    """Parse a PDF metadata date like ``D:20240115120000+00'00'`` to ISO UTC."""
+    if not raw:
+        return None
+    match = re.match(r"D?:?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?", raw.strip())
+    if not match:
+        return None
+    year, month, day, hour, minute, second = (
+        int(part) if part else default
+        for part, default in zip(match.groups(), (0, 1, 1, 0, 0, 0))
+    )
+    try:
+        parsed = datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return parsed.replace(microsecond=0).isoformat()
+
+
+def extract_pdf(file_bytes: bytes, file_name: str, name: str = "") -> list[dict[str, Any]]:
+    """Extract text from an uploaded PDF into a single searchable item."""
+    if not file_bytes:
+        raise ExtractionError("The uploaded PDF is empty.")
+    try:
+        with fitz.open(stream=file_bytes, filetype="pdf") as document:
+            pages = [page.get_text("text") for page in document]
+            metadata = document.metadata or {}
+    except Exception as exc:  # PyMuPDF raises a broad set of errors on bad input
+        raise ExtractionError(f"Could not read this PDF: {exc}") from exc
+
+    text = clean_text("\n".join(pages))
+    if len(text) < 20:
+        raise ExtractionError(
+            "This PDF contained no extractable text. Scanned/image-only PDFs need OCR, "
+            "which is out of scope for this MVP."
+        )
+
+    meta_title = clean_text(metadata.get("title", ""))
+    title = name.strip() or meta_title or file_name
+    timestamp = _parse_pdf_date(metadata.get("creationDate") or metadata.get("modDate"))
+    return [
+        {
+            "title": title,
+            "url": "",
+            "timestamp": timestamp,
             "content": text,
         }
     ]

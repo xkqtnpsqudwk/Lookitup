@@ -8,6 +8,7 @@ const TYPE_LABELS: Record<Source["type"], string> = {
   rss: "RSS feed",
   website: "Website",
   manual: "Manual text",
+  pdf: "PDF",
 };
 
 export default function SourceList({ sources }: SourceListProps) {

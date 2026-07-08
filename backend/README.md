@@ -21,6 +21,7 @@ uvicorn main:app --reload
 | GET    | `/health`               | Liveness check → `{"status": "ok"}`            |
 | GET    | `/sources`              | List all stored trusted sources                |
 | POST   | `/sources`              | Add an `rss`, `website`, or `manual` source    |
+| POST   | `/sources/pdf`          | Add a `pdf` source (multipart file upload)     |
 | DELETE | `/sources`              | Clear all sources (reset demo data)            |
 | POST   | `/sources/load-samples` | Load bundled `data/sample_sources.json`        |
 | GET    | `/search`               | Search stored sources (`?q=` and `?sort=`)     |
@@ -33,6 +34,14 @@ uvicorn main:app --reload
 
 // manual
 { "name": "Reporter note", "type": "manual", "content": "Text to search..." }
+```
+
+PDF sources use a multipart upload instead of JSON:
+
+```bash
+curl -X POST http://localhost:8000/sources/pdf \
+  -F "file=@report.pdf;type=application/pdf" \
+  -F "name=Newsroom report"
 ```
 
 ### Search
@@ -53,7 +62,7 @@ backend/
 │  └─ schemas.py               Pydantic request/response models
 ├─ services/
 │  ├─ storage_service.py       JSON read/write
-│  ├─ extractor_service.py     RSS / website / manual → searchable items
+│  ├─ extractor_service.py     RSS / website / manual / PDF → searchable items
 │  ├─ source_service.py        add / list / delete / load-samples
 │  └─ search_service.py        keyword search, scoring, excerpts
 └─ data/

@@ -44,6 +44,17 @@ export default function HomePage() {
     }
   }
 
+  async function handleAddPdf(file: File, name: string) {
+    setSourceBusy(true);
+    setError("");
+    try {
+      await api.uploadPdf(file, name);
+      await refreshSources();
+    } finally {
+      setSourceBusy(false);
+    }
+  }
+
   async function handleLoadSamples() {
     setSourceBusy(true);
     setError("");
@@ -105,7 +116,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <SourceForm onAdd={handleAddSource} busy={sourceBusy} />
+          <SourceForm onAdd={handleAddSource} onAddPdf={handleAddPdf} busy={sourceBusy} />
 
           <div className="sourceActions">
             <button type="button" onClick={handleLoadSamples} disabled={sourceBusy}>
