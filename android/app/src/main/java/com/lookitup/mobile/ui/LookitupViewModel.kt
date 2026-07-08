@@ -22,6 +22,8 @@ data class LookitupUiState(
     val sourceName: String = "",
     val sourceUrl: String = "",
     val sourceContent: String = "",
+    val sourceDateFrom: String = "",
+    val sourceDateTo: String = "",
     val isLoading: Boolean = false,
     val error: String = "",
     val notice: String = "",
@@ -117,6 +119,8 @@ class LookitupViewModel(
             type = state.sourceType,
             url = if (state.sourceType == "manual") "" else state.sourceUrl.trim(),
             content = if (state.sourceType == "manual") state.sourceContent.trim() else "",
+            dateFrom = if (state.sourceType == "rss") state.sourceDateFrom else "",
+            dateTo = if (state.sourceType == "rss") state.sourceDateTo else "",
         )
 
         if (payload.type == "manual" && payload.content.isBlank()) {
@@ -125,6 +129,10 @@ class LookitupViewModel(
         }
         if (payload.type != "manual" && payload.url.isBlank()) {
             _uiState.update { it.copy(error = "RSS and website sources need a URL.") }
+            return
+        }
+        if (payload.type == "rss" && payload.dateFrom.isNotBlank() && payload.dateTo.isNotBlank() && payload.dateFrom > payload.dateTo) {
+            _uiState.update { it.copy(error = "RSS start date must be before the end date.") }
             return
         }
 
@@ -137,6 +145,8 @@ class LookitupViewModel(
                     sourceName = "",
                     sourceUrl = "",
                     sourceContent = "",
+                    sourceDateFrom = "",
+                    sourceDateTo = "",
                     notice = "Trusted source added.",
                 )
             }
@@ -165,6 +175,14 @@ class LookitupViewModel(
 
     fun setSourceContent(value: String) {
         _uiState.update { it.copy(sourceContent = value, error = "", notice = "") }
+    }
+
+    fun setSourceDateFrom(value: String) {
+        _uiState.update { it.copy(sourceDateFrom = value, error = "", notice = "") }
+    }
+
+    fun setSourceDateTo(value: String) {
+        _uiState.update { it.copy(sourceDateTo = value, error = "", notice = "") }
     }
 
     private fun launchWithLoading(block: suspend () -> Unit) {

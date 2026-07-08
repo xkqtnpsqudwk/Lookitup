@@ -1,5 +1,6 @@
 package com.lookitup.mobile.ui
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -32,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lookitup.mobile.data.SearchResultDto
 import com.lookitup.mobile.data.SourceDto
+import java.util.Calendar
 
 private val LookitupColors = lightColorScheme(
     primary = Color(0xFF0F766E),
@@ -68,6 +71,8 @@ fun LookitupApp(viewModel: LookitupViewModel = viewModel()) {
                 onSourceNameChange = viewModel::setSourceName,
                 onSourceUrlChange = viewModel::setSourceUrl,
                 onSourceContentChange = viewModel::setSourceContent,
+                onSourceDateFromChange = viewModel::setSourceDateFrom,
+                onSourceDateToChange = viewModel::setSourceDateTo,
                 onAddSource = viewModel::addSource,
             )
         }
@@ -88,6 +93,8 @@ private fun LookitupScreen(
     onSourceNameChange: (String) -> Unit,
     onSourceUrlChange: (String) -> Unit,
     onSourceContentChange: (String) -> Unit,
+    onSourceDateFromChange: (String) -> Unit,
+    onSourceDateToChange: (String) -> Unit,
     onAddSource: () -> Unit,
 ) {
     LazyColumn(
@@ -122,6 +129,8 @@ private fun LookitupScreen(
                 onSourceNameChange = onSourceNameChange,
                 onSourceUrlChange = onSourceUrlChange,
                 onSourceContentChange = onSourceContentChange,
+                onSourceDateFromChange = onSourceDateFromChange,
+                onSourceDateToChange = onSourceDateToChange,
                 onAddSource = onAddSource,
             )
         }
@@ -217,6 +226,8 @@ private fun SourcePanel(
     onSourceNameChange: (String) -> Unit,
     onSourceUrlChange: (String) -> Unit,
     onSourceContentChange: (String) -> Unit,
+    onSourceDateFromChange: (String) -> Unit,
+    onSourceDateToChange: (String) -> Unit,
     onAddSource: () -> Unit,
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
@@ -259,6 +270,8 @@ private fun SourcePanel(
                 onSourceNameChange = onSourceNameChange,
                 onSourceUrlChange = onSourceUrlChange,
                 onSourceContentChange = onSourceContentChange,
+                onSourceDateFromChange = onSourceDateFromChange,
+                onSourceDateToChange = onSourceDateToChange,
                 onAddSource = onAddSource,
             )
 
@@ -295,6 +308,8 @@ private fun SourceCreateForm(
     onSourceNameChange: (String) -> Unit,
     onSourceUrlChange: (String) -> Unit,
     onSourceContentChange: (String) -> Unit,
+    onSourceDateFromChange: (String) -> Unit,
+    onSourceDateToChange: (String) -> Unit,
     onAddSource: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -333,6 +348,35 @@ private fun SourceCreateForm(
                 label = { Text("URL") },
                 singleLine = true,
             )
+            if (state.sourceType == "rss") {
+                Text(
+                    text = "Optional RSS date range",
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DatePickerButton(
+                        label = "From",
+                        value = state.sourceDateFrom,
+                        onDateSelected = onSourceDateFromChange,
+                    )
+                    DatePickerButton(
+                        label = "To",
+                        value = state.sourceDateTo,
+                        onDateSelected = onSourceDateToChange,
+                    )
+                }
+                if (state.sourceDateFrom.isNotBlank() || state.sourceDateTo.isNotBlank()) {
+                    TextButton(
+                        onClick = {
+                            onSourceDateFromChange("")
+                            onSourceDateToChange("")
+                        },
+                    ) {
+                        Text("Clear dates")
+                    }
+                }
+            }
         }
         Button(
             enabled = !state.isLoading,
@@ -341,6 +385,45 @@ private fun SourceCreateForm(
             Text("Add source")
         }
     }
+}
+
+@Composable
+private fun DatePickerButton(
+    label: String,
+    value: String,
+    onDateSelected: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    OutlinedButton(
+        onClick = {
+            val calendar = calendarFromIsoDate(value)
+            DatePickerDialog(
+                context,
+                { _, year, month, dayOfMonth ->
+                    onDateSelected("%04d-%02d-%02d".format(year, month + 1, dayOfMonth))
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH),
+            ).show()
+        },
+    ) {
+        Text(if (value.isBlank()) label else "$label: $value")
+    }
+}
+
+private fun calendarFromIsoDate(value: String): Calendar {
+    val calendar = Calendar.getInstance()
+    val parts = value.split("-")
+    if (parts.size == 3) {
+        val year = parts[0].toIntOrNull()
+        val month = parts[1].toIntOrNull()
+        val day = parts[2].toIntOrNull()
+        if (year != null && month != null && day != null) {
+            calendar.set(year, month - 1, day)
+        }
+    }
+    return calendar
 }
 
 @Composable
