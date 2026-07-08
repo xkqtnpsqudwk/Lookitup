@@ -54,16 +54,33 @@ pip install -r requirements.txt
 
 ## Run
 
-Frontend prototype:
-
-```bash
-python -m streamlit run app.py
-```
-
-Backend API:
+Backend API first:
 
 ```bash
 python -m uvicorn backend.main:app --reload --port 8000
+```
+
+React + Vite frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://localhost:5173
+```
+
+The React app calls the FastAPI backend at `http://127.0.0.1:8000`.
+
+Legacy Streamlit prototype:
+
+
+```bash
+python -m streamlit run app.py
 ```
 
 The app runs locally and stores added sources in `data/trusted_sources.json`.
