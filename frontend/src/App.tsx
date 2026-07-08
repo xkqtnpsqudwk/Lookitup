@@ -2,12 +2,6 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type SortBy = "BM25 relevance" | "newest first";
 
-type SourcePack = {
-  id: string;
-  name: string;
-  description: string;
-};
-
 type SourceRecord = {
   id: string;
   source_name: string;
@@ -46,7 +40,7 @@ type SearchState = {
 
 type SearchResponse = {
   query: string;
-  source_pack: SourcePack;
+  selected_sources: SourceRecord[];
   status: SearchState;
   index_stats: {
     documents: number;
@@ -60,31 +54,37 @@ type SourceListResponse = {
   sources: SourceRecord[];
 };
 
+type DemoScenario = {
+  label: string;
+  query: string;
+  sourceIds: string[];
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
 const NO_RESULTS_TEXT =
   "No result found does not mean the claim is false. It only means Lookitup could not find it inside your selected trusted sources.";
 
-const DEMO_SCENARIOS = [
+const DEMO_SCENARIOS: DemoScenario[] = [
   {
     label: "Iran Israel rockets",
     query: "Iran Israel rockets",
-    packId: "international-breaking-news",
+    sourceIds: ["sample-iran-rockets-1", "sample-iran-rockets-2", "sample-iran-rockets-3"],
   },
   {
     label: "AI copyright",
     query: "AI copyright and journalism",
-    packId: "wire-services",
+    sourceIds: ["sample-ai-copyright-journalism"],
   },
   {
     label: "France AI regulation",
     query: "France AI regulation",
-    packId: "france-official-sources",
+    sourceIds: ["sample-france-ai-regulation"],
   },
   {
     label: "Fake image",
     query: "fake image on social media",
-    packId: "local-authorities",
+    sourceIds: ["sample-fake-image-social-media"],
   },
 ];
 
@@ -120,14 +120,13 @@ function normalizeState(result: SearchResponse | null) {
   return {
     tone: "success",
     title: `${result.cards.length} trusted result${result.cards.length === 1 ? "" : "s"} found`,
-    message: "Search results are limited to the selected trusted source pack.",
+    message: "Search results are limited to your selected trusted sources.",
   };
 }
 
 export default function App() {
-  const [packs, setPacks] = useState<SourcePack[]>([]);
-  const [selectedPackId, setSelectedPackId] = useState("international-breaking-news");
   const [sources, setSources] = useState<SourceRecord[]>([]);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [includeSamples, setIncludeSamples] = useState(true);
   const [query, setQuery] = useState("Iran Israel rockets");
   const [sortBy, setSortBy] = useState<SortBy>("BM25 relevance");
@@ -136,42 +135,37 @@ export default function App() {
   const [error, setError] = useState("");
   const resultPanelRef = useRef<HTMLElement | null>(null);
 
-  const selectedPack = useMemo(
-    () => packs.find((pack) => pack.id === selectedPackId),
-    [packs, selectedPackId],
+  const selectedSourceIdSet = useMemo(() => new Set(selectedSourceIds), [selectedSourceIds]);
+
+  const selectedSources = useMemo(
+    () => sources.filter((source) => selectedSourceIdSet.has(source.id)),
+    [sources, selectedSourceIdSet],
   );
 
-  const sourceTypeCounts = useMemo(() => {
-    return sources.reduce<Record<string, number>>((counts, source) => {
+  const selectedSourceTypeCounts = useMemo(() => {
+    return selectedSources.reduce<Record<string, number>>((counts, source) => {
       counts[source.source_type] = (counts[source.source_type] || 0) + 1;
       return counts;
     }, {});
-  }, [sources]);
+  }, [selectedSources]);
 
   const resultState = normalizeState(searchResult);
 
   useEffect(() => {
-    fetchJson<SourcePack[]>("/source-packs")
+    fetchJson<SourceListResponse>(`/sources?include_samples=${includeSamples}`)
       .then((data) => {
-        setPacks(data);
-        if (data.length && !data.some((pack) => pack.id === selectedPackId)) {
-          setSelectedPackId(data[0].id);
-        }
+        setSources(data.sources);
+        setSelectedSourceIds((current) => {
+          const availableIds = new Set(data.sources.map((source) => source.id));
+          const keptIds = current.filter((sourceId) => availableIds.has(sourceId));
+          return keptIds.length ? keptIds : data.sources.map((source) => source.id);
+        });
       })
       .catch(() => {
         setError("Backend is not reachable. Start FastAPI on http://127.0.0.1:8000.");
       });
-  }, []);
-
-  useEffect(() => {
-    if (!selectedPackId) return;
-    fetchJson<SourceListResponse>(
-      `/sources?pack_id=${encodeURIComponent(selectedPackId)}&include_samples=${includeSamples}`,
-    )
-      .then((data) => setSources(data.sources))
-      .catch(() => setError("Could not load sources for the selected pack."));
     setSearchResult(null);
-  }, [selectedPackId, includeSamples]);
+  }, [includeSamples]);
 
   useEffect(() => {
     if (!searchResult) return;
@@ -186,8 +180,8 @@ export default function App() {
       setError("Enter a topic, keyword, event, or claim first.");
       return;
     }
-    if (!selectedPackId) {
-      setError("Select a trusted source pack first.");
+    if (selectedSourceIds.length === 0) {
+      setError("Select at least one trusted source first.");
       return;
     }
 
@@ -198,7 +192,7 @@ export default function App() {
         method: "POST",
         body: JSON.stringify({
           query,
-          source_pack_id: selectedPackId,
+          source_ids: selectedSourceIds,
           include_samples: includeSamples,
           sort_by: sortBy,
           limit: 12,
@@ -212,9 +206,29 @@ export default function App() {
     }
   }
 
-  function applyDemoScenario(packId: string, nextQuery: string) {
-    setSelectedPackId(packId);
-    setQuery(nextQuery);
+  function toggleSource(sourceId: string) {
+    setSelectedSourceIds((current) =>
+      current.includes(sourceId)
+        ? current.filter((selectedId) => selectedId !== sourceId)
+        : [...current, sourceId],
+    );
+    setSearchResult(null);
+  }
+
+  function selectAllSources() {
+    setSelectedSourceIds(sources.map((source) => source.id));
+    setSearchResult(null);
+  }
+
+  function clearSourceSelection() {
+    setSelectedSourceIds([]);
+    setSearchResult(null);
+  }
+
+  function applyDemoScenario(scenario: DemoScenario) {
+    setIncludeSamples(true);
+    setSelectedSourceIds(scenario.sourceIds);
+    setQuery(scenario.query);
     setSearchResult(null);
   }
 
@@ -232,8 +246,8 @@ export default function App() {
           </a>
         </div>
         <p className="heroCopy">
-          Google searches the open web. Lookitup searches your trusted world. Search first. Trusted
-          sources only. Journalists decide.
+          Google searches the open web. Lookitup searches your trusted world. Select sources,
+          search a topic, then review the Trusted Result Cards.
         </p>
       </header>
 
@@ -249,56 +263,63 @@ export default function App() {
             </div>
           </div>
 
-          <div className="packGrid">
-            {packs.map((pack) => (
-              <button
-                className={pack.id === selectedPackId ? "packCard active" : "packCard"}
-                key={pack.id}
-                onClick={() => setSelectedPackId(pack.id)}
-                type="button"
-              >
-                <strong>{pack.name}</strong>
-                <span>{pack.description}</span>
+          <div className="sourceToolbar">
+            <label className="checkRow">
+              <input
+                type="checkbox"
+                checked={includeSamples}
+                onChange={(event) => setIncludeSamples(event.target.checked)}
+              />
+              Show demo sample sources
+            </label>
+            <div>
+              <button type="button" onClick={selectAllSources} disabled={sources.length === 0}>
+                Select all
               </button>
-            ))}
+              <button type="button" onClick={clearSourceSelection} disabled={selectedSourceIds.length === 0}>
+                Clear
+              </button>
+            </div>
           </div>
-
-          <label className="checkRow">
-            <input
-              type="checkbox"
-              checked={includeSamples}
-              onChange={(event) => setIncludeSamples(event.target.checked)}
-            />
-            Include local sample fallback corpus
-          </label>
 
           <div className="sourceSummary">
             <div>
-              <small>Selected pack</small>
-              <strong>{selectedPack?.name || "No pack selected"}</strong>
+              <small>Selected sources</small>
+              <strong>{selectedSourceIds.length}</strong>
             </div>
             <div>
-              <small>Trusted sources</small>
+              <small>Available sources</small>
               <strong>{sources.length}</strong>
             </div>
             <div>
-              <small>Source formats</small>
-              <strong>{Object.keys(sourceTypeCounts).length}</strong>
+              <small>Selected formats</small>
+              <strong>{Object.keys(selectedSourceTypeCounts).length}</strong>
             </div>
           </div>
 
           <div className="sourceList">
             {sources.length === 0 ? (
-              <p className="muted">No trusted sources are available in this pack.</p>
+              <p className="muted">No trusted sources are available yet.</p>
             ) : (
-              sources.map((source) => (
-                <article key={source.id}>
-                  <strong>{source.source_name}</strong>
-                  <span>
-                    {source.source_type} - {dateLabel(source.timestamp)}
-                  </span>
-                </article>
-              ))
+              sources.map((source) => {
+                const selected = selectedSourceIdSet.has(source.id);
+                return (
+                  <label className={selected ? "sourceCard active" : "sourceCard"} key={source.id}>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleSource(source.id)}
+                    />
+                    <span className="sourceCardBody">
+                      <strong>{source.source_name}</strong>
+                      <span className="sourceMeta">
+                        {source.source_type} - {dateLabel(source.timestamp)}
+                      </span>
+                      <span className="trustLabel">{source.trust_label || "Trusted source"}</span>
+                    </span>
+                  </label>
+                );
+              })
             )}
           </div>
         </section>
@@ -330,8 +351,8 @@ export default function App() {
                   <option value="newest first">Newest first</option>
                 </select>
               </label>
-              <button type="submit" disabled={loading || sources.length === 0}>
-                {loading ? "Searching..." : "Search trusted sources"}
+              <button type="submit" disabled={loading || selectedSourceIds.length === 0}>
+                {loading ? "Searching..." : "Search selected sources"}
               </button>
             </div>
           </form>
@@ -342,7 +363,7 @@ export default function App() {
               <button
                 key={scenario.label}
                 type="button"
-                onClick={() => applyDemoScenario(scenario.packId, scenario.query)}
+                onClick={() => applyDemoScenario(scenario)}
               >
                 {scenario.label}
               </button>
@@ -350,8 +371,7 @@ export default function App() {
           </div>
 
           <p className="hint">
-            Main search is keyword-based and fast. It searches only inside the selected trusted
-            source pack.
+            Search is keyword-based and fast. The backend only searches the sources checked in step 1.
           </p>
         </section>
       </section>
@@ -378,7 +398,7 @@ export default function App() {
         {!searchResult && (
           <div className="emptyState">
             <strong>Run a search to review trusted results.</strong>
-            <p>Recommended demo: select International Breaking News Pack and search Iran Israel rockets.</p>
+            <p>Recommended demo: click Iran Israel rockets, then search selected sources.</p>
           </div>
         )}
 

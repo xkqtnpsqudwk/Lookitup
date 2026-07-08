@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
 from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException, Query
@@ -18,33 +16,17 @@ from utils.source_loader import load_rss_feed, load_website, make_source_record
 from utils.storage import (
     add_sources,
     get_all_sources,
-    get_sources_for_pack,
-    load_source_packs,
-    save_source_packs,
 )
 from utils.summarizer import generate_summary
 
 
-def utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-class SourcePackCreate(BaseModel):
-    id: str | None = Field(default=None, description="Optional stable source pack id.")
-    name: str
-    description: str = ""
-    created_by: str = "Lookitup API"
-
-
 class UrlSourceCreate(BaseModel):
-    pack_id: str
     url: str
     source_name: str = ""
     trust_label: str = "Trusted source"
 
 
 class RssSourceCreate(BaseModel):
-    pack_id: str
     url: str
     source_name: str = ""
     trust_label: str = "Trusted source"
@@ -52,7 +34,6 @@ class RssSourceCreate(BaseModel):
 
 
 class LocalTextSourceCreate(BaseModel):
-    pack_id: str
     source_name: str
     title: str = ""
     text: str
@@ -63,7 +44,7 @@ class LocalTextSourceCreate(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str
-    source_pack_id: str
+    source_ids: list[str] = Field(default_factory=list)
     include_samples: bool = True
     limit: int = Field(default=10, ge=1, le=50)
     sort_by: Literal["BM25 relevance", "newest first"] = "BM25 relevance"
@@ -76,7 +57,7 @@ class SummaryRequest(SearchRequest):
 app = FastAPI(
     title="Lookitup Backend",
     version="0.1.0",
-    description="Controlled retrieval API for preset source packs and Trusted Result Cards.",
+    description="Controlled retrieval API for selected trusted sources and Trusted Result Cards.",
 )
 
 app.add_middleware(
@@ -95,31 +76,48 @@ app.add_middleware(
 )
 
 
-def require_pack(pack_id: str) -> dict[str, Any]:
-    for pack in load_source_packs():
-        if pack.get("id") == pack_id:
-            return pack
-    raise HTTPException(status_code=404, detail=f"Unknown source pack: {pack_id}")
-
-
-def stamp_sources(records: list[dict[str, Any]], pack_id: str, trust_label: str) -> list[dict[str, Any]]:
+def stamp_sources(records: list[dict[str, Any]], trust_label: str) -> list[dict[str, Any]]:
     stamped = []
     for record in records:
         source = dict(record)
-        source["pack_id"] = pack_id
         source["trust_label"] = trust_label.strip() or "Trusted source"
         stamped.append(source)
     return stamped
 
 
+def get_selected_sources(source_ids: list[str], include_samples: bool) -> list[dict[str, Any]]:
+    selected_ids = list(dict.fromkeys(source_id.strip() for source_id in source_ids if source_id.strip()))
+    if not selected_ids:
+        raise HTTPException(status_code=400, detail="Select at least one trusted source.")
+
+    available_sources = get_all_sources(include_samples)
+    sources_by_id = {str(source.get("id", "")): source for source in available_sources}
+    missing_ids = [source_id for source_id in selected_ids if source_id not in sources_by_id]
+    if missing_ids:
+        raise HTTPException(status_code=404, detail=f"Unknown source id(s): {', '.join(missing_ids)}")
+
+    return [sources_by_id[source_id] for source_id in selected_ids]
+
+
+def source_summary(source: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": source.get("id"),
+        "source_name": source.get("source_name"),
+        "source_type": source.get("source_type"),
+        "source_url": source.get("source_url"),
+        "title": source.get("title"),
+        "timestamp": source.get("timestamp"),
+        "trust_label": source.get("trust_label"),
+    }
+
+
 def build_search_response(request: SearchRequest) -> dict[str, Any]:
-    require_pack(request.source_pack_id)
-    sources = get_sources_for_pack(request.source_pack_id, request.include_samples)
+    sources = get_selected_sources(request.source_ids, request.include_samples)
     cards = search_evidence_cards(request.query, sources, limit=request.limit, sort_by=request.sort_by)
     state = evaluate_search_state(request.query, cards)
     return {
         "query": request.query,
-        "source_pack": require_pack(request.source_pack_id),
+        "selected_sources": [source_summary(source) for source in sources],
         "status": state,
         "index_stats": build_evidence_index_stats(sources),
         "cards": cards,
@@ -131,40 +129,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/source-packs")
-def list_source_packs() -> list[dict[str, Any]]:
-    return load_source_packs()
-
-
-@app.post("/source-packs", status_code=201)
-def create_source_pack(payload: SourcePackCreate) -> dict[str, Any]:
-    packs = load_source_packs()
-    pack_id = payload.id or str(uuid.uuid4())
-    if any(pack.get("id") == pack_id for pack in packs):
-        raise HTTPException(status_code=409, detail=f"Source pack already exists: {pack_id}")
-
-    pack = {
-        "id": pack_id,
-        "name": payload.name,
-        "description": payload.description,
-        "created_by": payload.created_by,
-        "created_at": utc_now_iso(),
-    }
-    packs.append(pack)
-    save_source_packs(packs)
-    return pack
-
-
 @app.get("/sources")
 def list_sources(
-    pack_id: str | None = Query(default=None),
     include_samples: bool = Query(default=True),
 ) -> dict[str, Any]:
-    if pack_id:
-        require_pack(pack_id)
-        sources = get_sources_for_pack(pack_id, include_samples)
-    else:
-        sources = get_all_sources(include_samples)
+    sources = get_all_sources(include_samples)
     return {
         "count": len(sources),
         "sources": sources,
@@ -173,31 +142,28 @@ def list_sources(
 
 @app.post("/sources/url", status_code=201)
 def add_url_source(payload: UrlSourceCreate) -> dict[str, Any]:
-    require_pack(payload.pack_id)
     try:
         record = load_website(payload.url, payload.source_name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    stamped = stamp_sources([record], payload.pack_id, payload.trust_label)
+    stamped = stamp_sources([record], payload.trust_label)
     add_sources(stamped)
     return {"added": 1, "source": stamped[0]}
 
 
 @app.post("/sources/rss", status_code=201)
 def add_rss_source(payload: RssSourceCreate) -> dict[str, Any]:
-    require_pack(payload.pack_id)
     try:
         records = load_rss_feed(payload.url, payload.source_name, payload.limit)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    stamped = stamp_sources(records, payload.pack_id, payload.trust_label)
+    stamped = stamp_sources(records, payload.trust_label)
     add_sources(stamped)
     return {"added": len(stamped), "sources": stamped}
 
 
 @app.post("/sources/local", status_code=201)
 def add_local_text_source(payload: LocalTextSourceCreate) -> dict[str, Any]:
-    require_pack(payload.pack_id)
     if not payload.text.strip():
         raise HTTPException(status_code=400, detail="Local text cannot be empty.")
     record = make_source_record(
@@ -208,7 +174,7 @@ def add_local_text_source(payload: LocalTextSourceCreate) -> dict[str, Any]:
         timestamp=payload.timestamp,
         text=payload.text,
     )
-    stamped = stamp_sources([record], payload.pack_id, payload.trust_label)
+    stamped = stamp_sources([record], payload.trust_label)
     add_sources(stamped)
     return {"added": 1, "source": stamped[0]}
 
@@ -223,7 +189,7 @@ def search(payload: SearchRequest) -> dict[str, Any]:
 @app.post("/evidence/group")
 def group_evidence(payload: SearchRequest) -> dict[str, Any]:
     response = build_search_response(payload)
-    response["grouping_message"] = "Evidence grouped by source and time."
+    response["grouping_message"] = "Trusted results grouped by source and time."
     response["groups"] = group_evidence_cards(response["cards"])
     return response
 
@@ -237,7 +203,7 @@ def summarize_evidence(payload: SummaryRequest) -> dict[str, Any]:
             "summary": {
                 "mode": "Blocked",
                 "summary": "Not found in trusted sources.",
-                "notice": "No retrieved Evidence Cards were available.",
+                "notice": "No retrieved Trusted Result Cards were available.",
             },
         }
 

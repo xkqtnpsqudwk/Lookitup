@@ -36,8 +36,8 @@ def _fallback_summary(query: str, results: list[dict[str, Any]], style: str) -> 
     first = top_results[0]
     source_names = ", ".join(f"[{index}] {result.get('source_name', 'trusted source')}" for index, result in enumerate(top_results[:3], start=1))
     return (
-        f"From the Evidence Cards shown for \"{query}\", the strongest matches come from {source_names}. "
-        f"The top Evidence Card says: {_trim(first.get('matched_quote') or first.get('excerpt') or first.get('text', ''), 360)} "
+        f"From the Trusted Result Cards shown for \"{query}\", the strongest matches come from {source_names}. "
+        f"The top Trusted Result Card says: {_trim(first.get('matched_quote') or first.get('excerpt') or first.get('text', ''), 360)} "
         "This summary is a starting point for review, not a final verification."
     )
 
@@ -61,15 +61,15 @@ def _llm_summary(query: str, results: list[dict[str, Any]], style: str) -> str |
                     f"Source: {result.get('source_name', 'Unknown source')}",
                     f"Type: {result.get('source_type', 'Unknown type')}",
                     f"Date: {result.get('date_display') or result.get('timestamp') or 'No date'}",
-                    f"Evidence Card citation: [{index}]",
+                    f"Trusted Result Card citation: [{index}]",
                     f"Matched quote: {_trim(result.get('matched_quote') or result.get('excerpt') or result.get('text', ''), 700)}",
                 ]
             )
         )
 
     prompt = (
-        "Summarize the search query using only the Evidence Cards below. "
-        "Cite supporting Evidence Cards with bracketed citation numbers. "
+        "Summarize the search query using only the Trusted Result Cards below. "
+        "Cite supporting Trusted Result Cards with bracketed citation numbers. "
         "Do not add outside facts. If evidence is missing, say Not found in trusted sources. "
         f"Style: {style}. Query: {query}\n\n" + "\n\n".join(context_blocks)
     )
@@ -81,7 +81,7 @@ def _llm_summary(query: str, results: list[dict[str, Any]], style: str) -> str |
             input=[
                 {
                     "role": "system",
-                    "content": "You help journalists summarize retrieved Evidence Cards without adding outside information or invented facts.",
+                    "content": "You help journalists summarize retrieved Trusted Result Cards without adding outside information or invented facts.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -97,10 +97,10 @@ def generate_summary(query: str, results: list[dict[str, Any]], style: str) -> d
         return {
             "summary": llm_output.strip(),
             "mode": "LLM summary",
-            "notice": "Generated only from retrieved Evidence Cards shown on this page.",
+            "notice": "Generated only from retrieved Trusted Result Cards shown on this page.",
         }
     return {
         "summary": _fallback_summary(query, results, style),
         "mode": "Fallback extractive summary",
-        "notice": "No LLM API key or compatible OpenAI client was available, so Lookitup used top Evidence Card quotes.",
+        "notice": "No LLM API key or compatible OpenAI client was available, so Lookitup used top Trusted Result Card quotes.",
     }

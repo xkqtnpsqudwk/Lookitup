@@ -262,7 +262,7 @@ def evaluate_search_state(query: str, cards: list[dict[str, Any]]) -> dict[str, 
     return {
         "status": "evidence_found",
         "label": "Evidence Found",
-        "message": "Matching Evidence Cards found in the selected trusted source pack.",
+        "message": "Matching Trusted Result Cards found in the selected trusted sources.",
     }
 
 

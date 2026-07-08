@@ -17,7 +17,8 @@ Search first. AI only when useful. Trusted sources only. Journalists decide.
 ## Technical Flow
 
 ```text
-Preset Trusted Source Pack
+Trusted source list
+  -> user selects source ids
   -> URL / RSS / local sample ingestion
   -> text extraction
   -> chunking
@@ -29,15 +30,11 @@ Preset Trusted Source Pack
 
 ## Features
 
-- Preset source packs:
-  - France Official Sources Pack
-  - International Breaking News Pack
-  - Wire Services Pack
-  - Local Authorities Pack
+- Direct trusted source selection. No hidden preset grouping layer.
 - URL, RSS, PDF, and local sample text ingestion.
 - Local sample corpus for demo reliability without network access.
 - SQLite FTS5 / BM25-style retrieval over chunked trusted text.
-- Topic search inside the selected trusted source pack.
+- Topic search inside only the selected trusted sources.
 - Trusted Result Cards with source name, source format, matched quote, timestamp, recency label, URL, match count, score, and explanation.
 - Clear no-result state:
   - `No result found does not mean the claim is false. It only means Lookitup could not find it inside your selected trusted sources.`
@@ -79,8 +76,6 @@ The app runs locally and stores added sources in `data/trusted_sources.json`.
 
 ```text
 GET  /health
-GET  /source-packs
-POST /source-packs
 GET  /sources
 POST /sources/url
 POST /sources/rss
@@ -90,7 +85,7 @@ POST /evidence/group
 POST /evidence/summary
 ```
 
-The React MVP uses `/source-packs`, `/sources`, and `/search` for the main demo flow.
+The React MVP uses `/sources` and `/search` for the main demo flow.
 The group and summary endpoints remain available for follow-up work, but they are not required for the core MVP path.
 
 Example search request:
@@ -98,7 +93,7 @@ Example search request:
 ```bash
 curl -X POST http://localhost:8000/search ^
   -H "Content-Type: application/json" ^
-  -d "{\"query\":\"Iran Israel rockets\",\"source_pack_id\":\"international-breaking-news\"}"
+  -d "{\"query\":\"Iran Israel rockets\",\"source_ids\":[\"sample-iran-rockets-1\",\"sample-iran-rockets-2\",\"sample-iran-rockets-3\"]}"
 ```
 
 OpenAPI docs are available at:
@@ -109,7 +104,7 @@ http://localhost:8000/docs
 
 ## Demo Queries
 
-In the React app, use the demo query chips or select `International Breaking News Pack` and search:
+In the React app, use the demo query chips or manually select trusted sources and search:
 
 ```text
 Iran Israel rockets
@@ -127,12 +122,12 @@ quantum banana treaty
 
 - Main flow: source selection -> topic search -> result review.
 - Search is keyword-based and does not require AI.
-- No login, no auth, no crawler, no production database.
+- No saved presets, login, auth, crawler, or production database.
 
 ## Limitations
 
 - This branch uses React + Vite instead of the originally recommended Next.js frontend.
-- The SQLite FTS5 index is built locally from the selected pack corpus at runtime.
+- The SQLite FTS5 index is built locally from the selected sources at runtime.
 - Website extraction may fail on pages that block requests or render content with JavaScript.
 - PDF extraction works best with text-based PDFs.
 - No login, accounts, payments, production crawler, or fake-image detection.

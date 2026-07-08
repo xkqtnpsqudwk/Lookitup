@@ -147,39 +147,33 @@ main {
   margin: 0;
 }
 
-.packGrid {
-  display: grid;
-  gap: 0.55rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.sourceToolbar {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  margin-bottom: 0.8rem;
 }
 
-.packCard {
-  background: #f8fafc;
+.sourceToolbar > div {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.sourceToolbar button {
+  background: #f1f5f9;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  color: #111827;
+  border-radius: 999px;
+  color: #334155;
   cursor: pointer;
-  min-height: 112px;
-  padding: 0.8rem;
-  text-align: left;
+  font-size: 0.84rem;
+  font-weight: 760;
+  padding: 0.42rem 0.68rem;
 }
 
-.packCard strong,
-.packCard span {
-  display: block;
-}
-
-.packCard span {
-  color: #64748b;
-  font-size: 0.86rem;
-  line-height: 1.35;
-  margin-top: 0.35rem;
-}
-
-.packCard.active {
-  background: #ecfdf5;
-  border-color: #0f766e;
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+.sourceToolbar button:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .checkRow {
@@ -190,6 +184,10 @@ main {
   gap: 0.5rem;
   justify-content: flex-start;
   margin: 0.8rem 0;
+}
+
+.sourceToolbar .checkRow {
+  margin: 0;
 }
 
 .checkRow input {
@@ -228,22 +226,45 @@ main {
   overflow: auto;
 }
 
-.sourceList article {
+.sourceCard {
+  align-items: flex-start;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  gap: 0.6rem;
   padding: 0.65rem;
 }
 
-.sourceList strong,
-.sourceList span {
+.sourceCard.active {
+  background: #ecfdf5;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.1);
+}
+
+.sourceCard input {
+  margin-top: 0.25rem;
+  width: auto;
+}
+
+.sourceCardBody,
+.sourceCardBody strong,
+.sourceCardBody span {
   display: block;
 }
 
-.sourceList span {
+.sourceMeta {
   color: #64748b;
   font-size: 0.86rem;
   margin-top: 0.15rem;
+}
+
+.trustLabel {
+  color: #0f766e;
+  font-size: 0.78rem;
+  font-weight: 760;
+  margin-top: 0.3rem;
 }
 
 .searchForm label {
@@ -465,14 +486,14 @@ footer {
 
 @media (max-width: 900px) {
   .stepGrid,
-  .packGrid,
   .sourceSummary,
   .searchControls {
     grid-template-columns: 1fr;
   }
 
   .heroRow,
-  .resultHeader {
+  .resultHeader,
+  .sourceToolbar {
     align-items: stretch;
     flex-direction: column;
   }
