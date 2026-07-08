@@ -1,6 +1,11 @@
 package com.lookitup.mobile.ui
 
 import android.app.DatePickerDialog
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,7 +78,10 @@ fun LookitupApp(viewModel: LookitupViewModel = viewModel()) {
                 onSourceContentChange = viewModel::setSourceContent,
                 onSourceDateFromChange = viewModel::setSourceDateFrom,
                 onSourceDateToChange = viewModel::setSourceDateTo,
+                onSourcePdfFileChange = viewModel::setSourcePdfFile,
                 onAddSource = viewModel::addSource,
+                onAddPdfSource = viewModel::addPdfSource,
+                onSourceError = viewModel::setSourceError,
             )
         }
     }
@@ -95,7 +103,10 @@ private fun LookitupScreen(
     onSourceContentChange: (String) -> Unit,
     onSourceDateFromChange: (String) -> Unit,
     onSourceDateToChange: (String) -> Unit,
+    onSourcePdfFileChange: (String, String) -> Unit,
     onAddSource: () -> Unit,
+    onAddPdfSource: (ByteArray, String) -> Unit,
+    onSourceError: (String) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -131,7 +142,10 @@ private fun LookitupScreen(
                 onSourceContentChange = onSourceContentChange,
                 onSourceDateFromChange = onSourceDateFromChange,
                 onSourceDateToChange = onSourceDateToChange,
+                onSourcePdfFileChange = onSourcePdfFileChange,
                 onAddSource = onAddSource,
+                onAddPdfSource = onAddPdfSource,
+                onSourceError = onSourceError,
             )
         }
 
@@ -228,7 +242,10 @@ private fun SourcePanel(
     onSourceContentChange: (String) -> Unit,
     onSourceDateFromChange: (String) -> Unit,
     onSourceDateToChange: (String) -> Unit,
+    onSourcePdfFileChange: (String, String) -> Unit,
     onAddSource: () -> Unit,
+    onAddPdfSource: (ByteArray, String) -> Unit,
+    onSourceError: (String) -> Unit,
 ) {
     Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(
@@ -272,7 +289,10 @@ private fun SourcePanel(
                 onSourceContentChange = onSourceContentChange,
                 onSourceDateFromChange = onSourceDateFromChange,
                 onSourceDateToChange = onSourceDateToChange,
+                onSourcePdfFileChange = onSourcePdfFileChange,
                 onAddSource = onAddSource,
+                onAddPdfSource = onAddPdfSource,
+                onSourceError = onSourceError,
             )
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -310,81 +330,162 @@ private fun SourceCreateForm(
     onSourceContentChange: (String) -> Unit,
     onSourceDateFromChange: (String) -> Unit,
     onSourceDateToChange: (String) -> Unit,
+    onSourcePdfFileChange: (String, String) -> Unit,
     onAddSource: () -> Unit,
+    onAddPdfSource: (ByteArray, String) -> Unit,
+    onSourceError: (String) -> Unit,
 ) {
+    val context = LocalContext.current
+
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = "Add trusted source",
             fontWeight = FontWeight.Bold,
             style = MaterialTheme.typography.titleMedium,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SourceTypeButton("manual", "Manual", state.sourceType, onSourceTypeChange)
-            SourceTypeButton("rss", "RSS", state.sourceType, onSourceTypeChange)
-            SourceTypeButton("website", "Website", state.sourceType, onSourceTypeChange)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SourceTypeButton("manual", "Manual", state.sourceType, onSourceTypeChange)
+                SourceTypeButton("rss", "RSS", state.sourceType, onSourceTypeChange)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SourceTypeButton("website", "Website", state.sourceType, onSourceTypeChange)
+                SourceTypeButton("pdf", "PDF", state.sourceType, onSourceTypeChange)
+            }
         }
         OutlinedTextField(
             value = state.sourceName,
             onValueChange = onSourceNameChange,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Display name") },
+            label = { Text(if (state.sourceType == "pdf") "Display name (optional)" else "Display name") },
             singleLine = true,
         )
-        if (state.sourceType == "manual") {
-            OutlinedTextField(
-                value = state.sourceContent,
-                onValueChange = onSourceContentChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 96.dp),
-                label = { Text("Trusted text") },
-                minLines = 4,
-            )
-        } else {
-            OutlinedTextField(
-                value = state.sourceUrl,
-                onValueChange = onSourceUrlChange,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("URL") },
-                singleLine = true,
-            )
-            if (state.sourceType == "rss") {
-                Text(
-                    text = "Optional RSS date range",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium,
+        when (state.sourceType) {
+            "manual" -> {
+                OutlinedTextField(
+                    value = state.sourceContent,
+                    onValueChange = onSourceContentChange,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 96.dp),
+                    label = { Text("Trusted text") },
+                    minLines = 4,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DatePickerButton(
-                        label = "From",
-                        value = state.sourceDateFrom,
-                        onDateSelected = onSourceDateFromChange,
+            }
+            "pdf" -> {
+                PdfFilePicker(
+                    selectedFileName = state.sourcePdfFileName,
+                    onFileSelected = onSourcePdfFileChange,
+                )
+            }
+            else -> {
+                OutlinedTextField(
+                    value = state.sourceUrl,
+                    onValueChange = onSourceUrlChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(if (state.sourceType == "rss") "RSS feed URL" else "Website URL") },
+                    singleLine = true,
+                )
+                if (state.sourceType == "rss") {
+                    Text(
+                        text = "Optional RSS date range",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMedium,
                     )
-                    DatePickerButton(
-                        label = "To",
-                        value = state.sourceDateTo,
-                        onDateSelected = onSourceDateToChange,
-                    )
-                }
-                if (state.sourceDateFrom.isNotBlank() || state.sourceDateTo.isNotBlank()) {
-                    TextButton(
-                        onClick = {
-                            onSourceDateFromChange("")
-                            onSourceDateToChange("")
-                        },
-                    ) {
-                        Text("Clear dates")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DatePickerButton(
+                            label = "From",
+                            value = state.sourceDateFrom,
+                            onDateSelected = onSourceDateFromChange,
+                        )
+                        DatePickerButton(
+                            label = "To",
+                            value = state.sourceDateTo,
+                            onDateSelected = onSourceDateToChange,
+                        )
+                    }
+                    if (state.sourceDateFrom.isNotBlank() || state.sourceDateTo.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                onSourceDateFromChange("")
+                                onSourceDateToChange("")
+                            },
+                        ) {
+                            Text("Clear dates")
+                        }
                     }
                 }
             }
         }
         Button(
             enabled = !state.isLoading,
-            onClick = onAddSource,
+            onClick = {
+                if (state.sourceType == "pdf") {
+                    val uri = state.sourcePdfUri
+                    if (uri.isBlank()) {
+                        onSourceError("Choose a PDF file to upload.")
+                        return@Button
+                    }
+                    val fileBytes = readBytesFromUri(context, uri)
+                    if (fileBytes == null) {
+                        onSourceError("Could not read the selected PDF.")
+                        return@Button
+                    }
+                    onAddPdfSource(fileBytes, state.sourcePdfFileName)
+                } else {
+                    onAddSource()
+                }
+            },
         ) {
-            Text("Add source")
+            Text(if (state.sourceType == "pdf") "Upload PDF" else "Add source")
         }
     }
+}
+
+@Composable
+private fun PdfFilePicker(
+    selectedFileName: String,
+    onFileSelected: (String, String) -> Unit,
+) {
+    val context = LocalContext.current
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            onFileSelected(uri.toString(), displayNameForUri(context, uri))
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedButton(onClick = { launcher.launch("application/pdf") }) {
+            Text(if (selectedFileName.isBlank()) "Choose PDF" else "Change PDF")
+        }
+        Text(
+            text = selectedFileName.ifBlank { "No PDF selected." },
+            color = MaterialTheme.colorScheme.secondary,
+            style = MaterialTheme.typography.bodySmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+private fun displayNameForUri(context: Context, uri: Uri): String {
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (cursor.moveToFirst() && index >= 0) {
+                val name = cursor.getString(index)
+                if (!name.isNullOrBlank()) return name
+            }
+        }
+    return uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { null } ?: "document.pdf"
+}
+
+private fun readBytesFromUri(context: Context, uriValue: String): ByteArray? {
+    return runCatching {
+        context.contentResolver.openInputStream(Uri.parse(uriValue))?.use { stream ->
+            stream.readBytes()
+        }
+    }.getOrNull()
 }
 
 @Composable

@@ -24,6 +24,8 @@ data class LookitupUiState(
     val sourceContent: String = "",
     val sourceDateFrom: String = "",
     val sourceDateTo: String = "",
+    val sourcePdfUri: String = "",
+    val sourcePdfFileName: String = "",
     val isLoading: Boolean = false,
     val error: String = "",
     val notice: String = "",
@@ -127,7 +129,11 @@ class LookitupViewModel(
             _uiState.update { it.copy(error = "Manual sources need text content.") }
             return
         }
-        if (payload.type != "manual" && payload.url.isBlank()) {
+        if (payload.type == "pdf") {
+            _uiState.update { it.copy(error = "Choose a PDF file to upload.") }
+            return
+        }
+        if ((payload.type == "rss" || payload.type == "website") && payload.url.isBlank()) {
             _uiState.update { it.copy(error = "RSS and website sources need a URL.") }
             return
         }
@@ -147,7 +153,30 @@ class LookitupViewModel(
                     sourceContent = "",
                     sourceDateFrom = "",
                     sourceDateTo = "",
+                    sourcePdfUri = "",
+                    sourcePdfFileName = "",
                     notice = "Trusted source added.",
+                )
+            }
+        }
+    }
+
+    fun addPdfSource(fileBytes: ByteArray, fileName: String) {
+        val state = _uiState.value
+        if (fileBytes.isEmpty()) {
+            _uiState.update { it.copy(error = "The selected PDF is empty.") }
+            return
+        }
+        launchWithLoading {
+            repository.addPdfSource(fileBytes, fileName, state.sourceName.trim())
+            val sources = repository.getSources()
+            _uiState.update {
+                it.copy(
+                    sources = sources,
+                    sourceName = "",
+                    sourcePdfUri = "",
+                    sourcePdfFileName = "",
+                    notice = "PDF source uploaded.",
                 )
             }
         }
@@ -183,6 +212,21 @@ class LookitupViewModel(
 
     fun setSourceDateTo(value: String) {
         _uiState.update { it.copy(sourceDateTo = value, error = "", notice = "") }
+    }
+
+    fun setSourcePdfFile(uri: String, fileName: String) {
+        _uiState.update {
+            it.copy(
+                sourcePdfUri = uri,
+                sourcePdfFileName = fileName,
+                error = "",
+                notice = "",
+            )
+        }
+    }
+
+    fun setSourceError(message: String) {
+        _uiState.update { it.copy(error = message, notice = "") }
     }
 
     private fun launchWithLoading(block: suspend () -> Unit) {
