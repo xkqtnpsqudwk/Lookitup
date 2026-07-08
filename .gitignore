@@ -19,3 +19,5 @@ frontend/*.tsbuildinfo
 
 .DS_Store
 Thumbs.db
+
+.claude/
