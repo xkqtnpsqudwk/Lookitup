@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from utils.search import build_excerpt, display_date, parse_timestamp
+from utils.search import build_excerpt, display_date, parse_timestamp, recency_label_and_boost
 
 
 EVENT_TERMS = {
@@ -137,6 +137,24 @@ def _match_count(query: str, text: str) -> int:
     return sum(len(re.findall(rf"\b{re.escape(term)}\b", text, flags=re.IGNORECASE)) for term in terms)
 
 
+def _exact_match_count(query: str, text: str) -> int:
+    clean_query = query.strip()
+    if not clean_query:
+        return 0
+    return text.lower().count(clean_query.lower())
+
+
+def _source_format(source_type: str) -> str:
+    normalized = source_type.lower()
+    if "rss" in normalized:
+        return "RSS"
+    if "website" in normalized or "url" in normalized:
+        return "Website"
+    if "pdf" in normalized:
+        return "PDF"
+    return "Manual text"
+
+
 def search_evidence_cards(
     query: str,
     sources: list[dict[str, Any]],
@@ -174,9 +192,15 @@ def search_evidence_cards(
     for row in rows:
         row_dict = dict(row)
         text = row_dict.get("text", "")
-        matches = _match_count(query, " ".join([row_dict.get("title", ""), text]))
+        searchable_text = " ".join([row_dict.get("title", ""), row_dict.get("source_name", ""), text])
+        matches = _match_count(query, searchable_text)
+        exact_matches = _exact_match_count(query, searchable_text)
         rank = float(row_dict.get("rank") or 0)
-        score = round(100 / (1 + abs(rank)) + matches, 2)
+        recency, recency_boost = recency_label_and_boost(row_dict["timestamp"])
+        score = round(100 / (1 + abs(rank)) + matches + (exact_matches * 4) + recency_boost, 2)
+        explanation = "Keyword found in this trusted source."
+        if exact_matches:
+            explanation = "Exact keyword or phrase found in this trusted source."
         cards.append(
             {
                 "chunk_id": row_dict["id"],
@@ -190,11 +214,15 @@ def search_evidence_cards(
                 "source_url": row_dict["url"],
                 "timestamp": row_dict["timestamp"],
                 "date_display": display_date(row_dict["timestamp"]),
+                "recency": recency,
+                "source_format": _source_format(row_dict["source_type"]),
                 "trust_label": row_dict["trust_label"],
                 "chunk_index": row_dict["chunk_index"],
                 "score": score,
                 "rank": rank,
                 "match_count": matches,
+                "exact_match_count": exact_matches,
+                "explanation": explanation,
                 "text": text,
             }
         )

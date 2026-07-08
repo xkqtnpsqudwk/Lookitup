@@ -76,7 +76,7 @@ class SummaryRequest(SearchRequest):
 app = FastAPI(
     title="Lookitup Backend",
     version="0.1.0",
-    description="Controlled retrieval API for preset source packs and Evidence Cards.",
+    description="Controlled retrieval API for preset source packs and Trusted Result Cards.",
 )
 
 app.add_middleware(
@@ -84,6 +84,8 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
         "http://localhost:4173",
         "http://127.0.0.1:4173",
     ],

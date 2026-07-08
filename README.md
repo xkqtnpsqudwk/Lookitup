@@ -2,15 +2,17 @@
 
 **Having a doubt? Just Lookitup.**
 
-Lookitup is a 48-hour hackathon MVP for journalists. It proves one workflow:
+Lookitup is a 48-hour hackathon MVP for journalists. The MVP proves one workflow:
 
-> A journalist selects a preset source pack, enters a text claim, searches only inside trusted sources, and receives Evidence Cards before publishing.
+> A journalist selects trusted sources, searches a topic, and reviews Trusted Result Cards before publishing.
 
 ## Core Message
 
 Google searches the open web. Lookitup searches your trusted world.
 
 Lookitup is not an AI truth machine. It helps journalists search faster inside sources they already trust.
+
+Search first. AI only when useful. Trusted sources only. Journalists decide.
 
 ## Technical Flow
 
@@ -20,10 +22,9 @@ Preset Trusted Source Pack
   -> text extraction
   -> chunking
   -> SQLite FTS5 search index
-  -> claim or keyword search
-  -> Evidence Card ranking
-  -> mismatch / not-found state
-  -> breaking-news evidence grouping
+  -> topic or keyword search
+  -> Trusted Result Card ranking
+  -> result review
 ```
 
 ## Features
@@ -36,14 +37,10 @@ Preset Trusted Source Pack
 - URL, RSS, PDF, and local sample text ingestion.
 - Local sample corpus for demo reliability without network access.
 - SQLite FTS5 / BM25-style retrieval over chunked trusted text.
-- Evidence Cards with source name, source type, matched quote, date, URL, ranking score, and trust label.
-- Result states:
-  - Evidence Found
-  - Mismatch: `Trusted sources say X. Claim says Y.`
-  - Not Found: `Not found in trusted sources.`
-- Breaking-news evidence grouping by source and time.
-- Optional evidence-grounded summary using only retrieved Evidence Cards.
-- Basic image EXIF review retained as a secondary demo utility.
+- Topic search inside the selected trusted source pack.
+- Trusted Result Cards with source name, source format, matched quote, timestamp, recency label, URL, match count, score, and explanation.
+- Clear no-result state:
+  - `No result found does not mean the claim is false. It only means Lookitup could not find it inside your selected trusted sources.`
 
 ## Installation
 
@@ -93,6 +90,9 @@ POST /evidence/group
 POST /evidence/summary
 ```
 
+The React MVP uses `/source-packs`, `/sources`, and `/search` for the main demo flow.
+The group and summary endpoints remain available for follow-up work, but they are not required for the core MVP path.
+
 Example search request:
 
 ```bash
@@ -109,41 +109,34 @@ http://localhost:8000/docs
 
 ## Demo Queries
 
-Use the `International Breaking News Pack`.
-
-Evidence found:
+In the React app, use the demo query chips or select `International Breaking News Pack` and search:
 
 ```text
 Iran Israel rockets
 ```
 
-Mismatch demo:
+Expected result: multiple Trusted Result Cards with timestamps and matched excerpts.
 
-```text
-Iran Israel drones
-```
-
-Not-found demo:
+No-result demo:
 
 ```text
 quantum banana treaty
 ```
 
-## Optional LLM Summary
+## MVP Scope
 
-The P0 product works without generation. If `OPENAI_API_KEY` and a compatible OpenAI client are available, Lookitup can generate a constrained summary from retrieved Evidence Cards only.
-
-If no key is available, Lookitup falls back to an extractive summary with Evidence Card citations.
+- Main flow: source selection -> topic search -> result review.
+- Search is keyword-based and does not require AI.
+- No login, no auth, no crawler, no production database.
 
 ## Limitations
 
 - This branch uses React + Vite instead of the originally recommended Next.js frontend.
 - The SQLite FTS5 index is built locally from the selected pack corpus at runtime.
-- Mismatch detection is deterministic and lightweight for the demo case.
 - Website extraction may fail on pages that block requests or render content with JavaScript.
 - PDF extraction works best with text-based PDFs.
 - No login, accounts, payments, production crawler, or fake-image detection.
 
 ## Technical Claim
 
-The technical value is a controlled retrieval pipeline that makes evidence visible before publication.
+The technical value is a controlled retrieval pipeline that makes trusted-source results visible before publication.
