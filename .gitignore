@@ -9,10 +9,12 @@ env/
 .env
 .streamlit/secrets.toml
 .streamlit.pid
+.backend.pid
 data/*.db
 data/*.sqlite
 data/*.sqlite3
 
+.idea/
 frontend/node_modules/
 frontend/dist/
 frontend/*.tsbuildinfo
