@@ -735,37 +735,13 @@ def render_images_tab() -> None:
 
 
 def render_about_tab() -> None:
-    st.subheader("About / Roadmap")
-    purpose_col, roadmap_col = st.columns(2, gap="large")
-
-    with purpose_col:
-        with st.container(border=True):
-            st.markdown("#### What Lookitup Is")
-            st.write(IMPORTANT_TEXT)
-            st.write(CORE_MESSAGE)
-            st.write("Lookitup is not a Google replacement and it is not an AI truth machine.")
-            st.write("It searches only inside sources selected by the journalist. Journalists make the final decision.")
-
-        with st.container(border=True):
-            st.markdown("#### Limitations")
-            st.write(
-                "- Search is simple keyword matching.\n"
-                "- Website extraction depends on page structure and access.\n"
-                "- PDF extraction works best for text-based PDFs, not scanned documents.\n"
-                "- Image flagging is a workflow marker, not proof of manipulation."
-            )
-
-    with roadmap_col:
-        with st.container(border=True):
-            st.markdown("#### Future Extensions")
-            st.write(
-                "- archive.org article version comparison\n"
-                "- C2PA provenance checks\n"
-                "- SynthID-related checks if detection access becomes available\n"
-                "- reverse image search\n"
-                "- claim breakdown\n"
-                "- source diversity indicator"
-            )
+    st.subheader("About")
+    with st.container(border=True):
+        st.markdown("#### What Lookitup Is")
+        st.write(IMPORTANT_TEXT)
+        st.write(CORE_MESSAGE)
+        st.write("Lookitup is not a Google replacement and it is not an AI truth machine.")
+        st.write("It searches only inside sources selected by the journalist. Journalists make the final decision.")
 
 
 def main() -> None:
@@ -775,7 +751,7 @@ def main() -> None:
     render_header()
 
     source_tab, search_tab, summary_tab, images_tab, about_tab = st.tabs(
-        ["1 Source Setup", "2 Search", "3 AI Summary", "4 Images", "5 About / Roadmap"]
+        ["1 Source Setup", "2 Search", "3 AI Summary", "4 Images", "5 About"]
     )
     with source_tab:
         render_source_setup_tab()
