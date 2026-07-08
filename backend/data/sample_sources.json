@@ -1,0 +1,74 @@
+[
+  {
+    "id": "sample_001",
+    "name": "Middle East Security Monitor",
+    "type": "rss",
+    "url": "https://example.com/security-monitor/rss",
+    "created_at": "2026-07-08T09:30:00",
+    "items": [
+      {
+        "title": "Rocket activity reported near the Iran-Israel border",
+        "url": "https://example.com/security-monitor/iran-israel-rockets-border",
+        "timestamp": "2026-07-08T10:30:00",
+        "content": "Regional defense officials reported a new round of Iran Israel rockets near several border communities. Casualty numbers remain unconfirmed. Journalists are advised to verify claims against official civil defense notices, hospital statements, and satellite imagery before publishing figures. Analysts warned that social media clips may mix current footage with older missile interceptions."
+      },
+      {
+        "title": "Diplomats urge caution after Iran Israel rockets reports",
+        "url": "https://example.com/security-monitor/diplomats-caution",
+        "timestamp": "2026-07-07T16:10:00",
+        "content": "Diplomatic sources urged caution after Iran Israel rockets reports circulated online. Early claims about launch sites and impact locations often change as official updates arrive. Editors should compare ministry statements, independent monitoring groups, and local newsroom confirmations before running a headline."
+      },
+      {
+        "title": "Energy routes monitored during Iran Israel rockets escalation",
+        "url": "https://example.com/security-monitor/energy-routes",
+        "timestamp": "2026-07-05T07:45:00",
+        "content": "Shipping desks and energy correspondents monitored regional routes during the Iran Israel rockets escalation. Oil market rumors should be separated from confirmed port closures, insurance advisories, and government notices. A lack of confirmation is not proof that a claim is false."
+      }
+    ]
+  },
+  {
+    "id": "sample_002",
+    "name": "Newsroom Law Notes",
+    "type": "manual",
+    "url": "https://example.com/reports/ai-copyright-journalism",
+    "created_at": "2026-06-12T12:00:00",
+    "items": [
+      {
+        "title": "AI copyright and journalism briefing",
+        "url": "https://example.com/reports/ai-copyright-journalism",
+        "timestamp": "2026-06-12T12:00:00",
+        "content": "This newsroom legal briefing reviews AI copyright and journalism questions, including training data disputes, licensing talks, and attribution practices. Editors are advised to document source material, keep generated summaries separate from reporting notes, and avoid presenting automated output as independently verified fact."
+      }
+    ]
+  },
+  {
+    "id": "sample_003",
+    "name": "Paris Policy Tracker",
+    "type": "website",
+    "url": "https://example.com/policy/france-ai-regulation",
+    "created_at": "2026-06-22T08:20:00",
+    "items": [
+      {
+        "title": "France AI regulation watch",
+        "url": "https://example.com/policy/france-ai-regulation",
+        "timestamp": "2026-06-22T08:20:00",
+        "content": "France AI regulation discussions focused on transparency duties, public sector procurement, and safety reporting for high impact systems. Journalists should distinguish national implementation steps from European Union requirements and from company announcements."
+      }
+    ]
+  },
+  {
+    "id": "sample_004",
+    "name": "Visual Verification Desk",
+    "type": "manual",
+    "url": "https://example.com/visual-verification/fake-image-social-media",
+    "created_at": "2026-05-30T14:05:00",
+    "items": [
+      {
+        "title": "Fake image on social media verification note",
+        "url": "https://example.com/visual-verification/fake-image-social-media",
+        "timestamp": "2026-05-30T14:05:00",
+        "content": "A fake image on social media was flagged by several newsroom verification teams after metadata was missing and the location claim did not match visible landmarks. Missing EXIF metadata does not prove manipulation, but it should prompt additional checks such as reverse image search, source tracing, and comparison with trusted local reports."
+      }
+    ]
+  }
+]

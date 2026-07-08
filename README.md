@@ -2,59 +2,71 @@
 
 **Having a doubt? Just Lookitup.**
 
-Lookitup is a 48-hour hackathon MVP for journalists. The MVP proves one workflow:
+A trusted-source search engine for journalists. Lookitup works like a search
+engine, but instead of searching the entire open web, it searches **only inside
+sources the journalist has chosen to trust**.
 
-> A journalist selects trusted sources, searches a topic, and reviews Trusted Result Cards before publishing.
+## Problem
 
-## Core Message
+When a story breaks, journalists are flooded with claims from the open web,
+where anything can rank. Verifying against sources they already trust is slow and
+manual. Lookitup makes that fast: add trusted sources once, then search inside
+only those sources.
 
-Google searches the open web. Lookitup searches your trusted world.
+## Core message
 
-Lookitup is not an AI truth machine. It helps journalists search faster inside sources they already trust.
+> Google searches the open web. Lookitup searches your trusted world.
+>
+> Search first. AI only when useful. Trusted sources only. Journalists decide.
 
-Search first. AI only when useful. Trusted sources only. Journalists decide.
+## MVP scope
 
-## Technical Flow
+The minimum flow, and the whole point of this MVP:
+
+1. **Add trusted sources** — RSS feed, website, or manual text.
+2. **Search inside those trusted sources** — keyword search, never the open web.
+3. **Show trusted results** — as Trusted Result Cards.
+
+No login, no accounts, no crawler, no universal fact-checker, no AI-for-every-query.
+
+## Tech stack
+
+- **Frontend:** React, Vite, TypeScript, plain CSS.
+- **Backend:** FastAPI, Python, Uvicorn, Pydantic.
+- **Storage:** local JSON files (`backend/data/`).
+- **Extraction:** `feedparser` (RSS), `requests` + `BeautifulSoup` (websites).
+
+## Project structure
 
 ```text
-Trusted source list
-  -> user selects source ids
-  -> URL / RSS / local sample ingestion
-  -> text extraction
-  -> chunking
-  -> SQLite FTS5 search index
-  -> topic or keyword search
-  -> Trusted Result Card ranking
-  -> result review
+lookitup/
+├─ frontend/          React + Vite + TS app
+│  └─ src/
+│     ├─ api/         backend client
+│     ├─ components/  Header, SourceForm, SourceList, SearchBar, ResultCard
+│     ├─ pages/       HomePage, AboutPage
+│     ├─ types/       shared TS types
+│     └─ styles/      global.css
+└─ backend/           FastAPI app
+   ├─ main.py         API endpoints
+   ├─ models/         Pydantic schemas
+   ├─ services/       source, search, extractor, storage
+   └─ data/           trusted_sources.json, sample_sources.json
 ```
 
-## Features
+## Install & run
 
-- Direct trusted source selection. No hidden preset grouping layer.
-- URL, RSS, PDF, and local sample text ingestion.
-- Local sample corpus for demo reliability without network access.
-- SQLite FTS5 / BM25-style retrieval over chunked trusted text.
-- Topic search inside only the selected trusted sources.
-- Trusted Result Cards with source name, source format, matched quote, timestamp, recency label, URL, match count, score, and explanation.
-- Clear no-result state:
-  - `No result found does not mean the claim is false. It only means Lookitup could not find it inside your selected trusted sources.`
-
-## Installation
+**Backend:**
 
 ```bash
-cd lookitup
+cd backend
 pip install -r requirements.txt
+uvicorn main:app --reload
 ```
 
-## Run
+The API runs at `http://localhost:8000` (OpenAPI docs at `/docs`).
 
-Backend API first:
-
-```bash
-python -m uvicorn backend.main:app --reload --port 8000
-```
-
-React + Vite frontend:
+**Frontend:**
 
 ```bash
 cd frontend
@@ -62,76 +74,45 @@ npm install
 npm run dev
 ```
 
-Open:
+The app runs at `http://localhost:5173` and calls the backend at
+`http://localhost:8000`. Override with a `VITE_API_BASE_URL` env var if needed.
+
+## Demo query
+
+1. Click **Load sample sources**.
+2. Search **`Iran Israel rockets`**.
+
+Expected result: multiple Trusted Result Cards with timestamps, matched
+excerpts, match counts, and relevance scores.
+
+## API endpoints
 
 ```text
-http://localhost:5173
+GET    /health                 → {"status": "ok"}
+GET    /sources                → list of trusted sources
+POST   /sources                → add an rss / website / manual source
+DELETE /sources                → clear all sources (reset demo)
+POST   /sources/load-samples   → load backend/data/sample_sources.json
+GET    /search?q=...&sort=...  → search (sort: relevance | newest)
 ```
-
-The React app calls the FastAPI backend at `http://127.0.0.1:8000`.
-
-The app runs locally and stores added sources in `data/trusted_sources.json`.
-
-## Backend API
-
-```text
-GET  /health
-GET  /sources
-POST /sources/url
-POST /sources/rss
-POST /sources/local
-POST /search
-POST /evidence/group
-POST /evidence/summary
-```
-
-The React MVP uses `/sources` and `/search` for the main demo flow.
-The group and summary endpoints remain available for follow-up work, but they are not required for the core MVP path.
-
-Example search request:
-
-```bash
-curl -X POST http://localhost:8000/search ^
-  -H "Content-Type: application/json" ^
-  -d "{\"query\":\"Iran Israel rockets\",\"source_ids\":[\"sample-iran-rockets-1\",\"sample-iran-rockets-2\",\"sample-iran-rockets-3\"]}"
-```
-
-OpenAPI docs are available at:
-
-```text
-http://localhost:8000/docs
-```
-
-## Demo Queries
-
-In the React app, use the demo query chips or manually select trusted sources and search:
-
-```text
-Iran Israel rockets
-```
-
-Expected result: multiple Trusted Result Cards with timestamps and matched excerpts.
-
-No-result demo:
-
-```text
-quantum banana treaty
-```
-
-## MVP Scope
-
-- Main flow: source selection -> topic search -> result review.
-- Search is keyword-based and does not require AI.
-- No saved presets, login, auth, crawler, or production database.
 
 ## Limitations
 
-- This branch uses React + Vite instead of the originally recommended Next.js frontend.
-- The SQLite FTS5 index is built locally from the selected sources at runtime.
-- Website extraction may fail on pages that block requests or render content with JavaScript.
-- PDF extraction works best with text-based PDFs.
-- No login, accounts, payments, production crawler, or fake-image detection.
+- **Lookitup is not a universal truth engine.**
+- **The quality of results depends on the quality of the trusted sources selected
+  by the journalist.**
+- **No result found does not mean the claim is false.**
+- **Lookitup does not search the open web by default.**
+- Website extraction may fail on pages that block requests or render with JavaScript.
+- Search is keyword-based; it does not understand meaning or synonyms.
 
-## Technical Claim
+## Future extensions
 
-The technical value is a controlled retrieval pipeline that makes trusted-source results visible before publication.
+Treated as out of scope for this MVP, but natural next steps:
+
+- Optional AI summary generated **from the trusted results only**.
+- Image EXIF metadata tab and image flagging.
+- Archive.org article-version comparison.
+- PDF upload (text extraction via PyMuPDF / pdfplumber).
+- Source diversity indicator.
+- C2PA / SynthID-related checks if reliable tooling becomes available.
