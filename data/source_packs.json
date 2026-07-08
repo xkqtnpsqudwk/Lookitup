@@ -1,0 +1,30 @@
+[
+  {
+    "id": "france-official-sources",
+    "name": "France Official Sources Pack",
+    "description": "Official and policy-oriented French public sources for regulation and public sector reporting.",
+    "created_by": "Lookitup demo",
+    "created_at": "2026-07-08T00:00:00Z"
+  },
+  {
+    "id": "international-breaking-news",
+    "name": "International Breaking News Pack",
+    "description": "Trusted sources for fast-moving international security and diplomacy stories.",
+    "created_by": "Lookitup demo",
+    "created_at": "2026-07-08T00:00:00Z"
+  },
+  {
+    "id": "wire-services",
+    "name": "Wire Services Pack",
+    "description": "Wire-style newsroom notes and legal briefings for media and journalism topics.",
+    "created_by": "Lookitup demo",
+    "created_at": "2026-07-08T00:00:00Z"
+  },
+  {
+    "id": "local-authorities",
+    "name": "Local Authorities Pack",
+    "description": "Local verification notes, authority-style updates, and visual verification fallback samples.",
+    "created_by": "Lookitup demo",
+    "created_at": "2026-07-08T00:00:00Z"
+  }
+]

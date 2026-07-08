@@ -15,29 +15,29 @@ def _trim(value: str, limit: int = 300) -> str:
 def _fallback_summary(query: str, results: list[dict[str, Any]], style: str) -> str:
     top_results = results[:5]
     if not top_results:
-        return "No trusted results are available to summarize."
+        return "Not found in trusted sources."
 
     if style == "bullet points":
         lines = []
-        for result in top_results:
+        for index, result in enumerate(top_results, start=1):
             source = result.get("source_name", "Trusted source")
             date = result.get("date_display") or result.get("timestamp") or "No date"
-            lines.append(f"- {source} ({date}): {_trim(result.get('excerpt') or result.get('text', ''), 220)}")
+            lines.append(f"- [{index}] {source} ({date}): {_trim(result.get('matched_quote') or result.get('excerpt') or result.get('text', ''), 220)}")
         return "\n".join(lines)
 
     if style == "timeline":
         dated_results = sorted(top_results, key=lambda item: item.get("timestamp") or "")
         lines = []
-        for result in dated_results:
+        for index, result in enumerate(dated_results, start=1):
             date = result.get("date_display") or result.get("timestamp") or "No date"
-            lines.append(f"- {date}: {result.get('source_name', 'Trusted source')} reports {_trim(result.get('excerpt') or result.get('text', ''), 200)}")
+            lines.append(f"- {date}: [{index}] {result.get('source_name', 'Trusted source')} reports {_trim(result.get('matched_quote') or result.get('excerpt') or result.get('text', ''), 200)}")
         return "\n".join(lines)
 
     first = top_results[0]
-    source_names = ", ".join(result.get("source_name", "trusted source") for result in top_results[:3])
+    source_names = ", ".join(f"[{index}] {result.get('source_name', 'trusted source')}" for index, result in enumerate(top_results[:3], start=1))
     return (
-        f"From the trusted results shown for \"{query}\", the strongest matches come from {source_names}. "
-        f"The top result says: {_trim(first.get('excerpt') or first.get('text', ''), 360)} "
+        f"From the Evidence Cards shown for \"{query}\", the strongest matches come from {source_names}. "
+        f"The top Evidence Card says: {_trim(first.get('matched_quote') or first.get('excerpt') or first.get('text', ''), 360)} "
         "This summary is a starting point for review, not a final verification."
     )
 
@@ -61,14 +61,16 @@ def _llm_summary(query: str, results: list[dict[str, Any]], style: str) -> str |
                     f"Source: {result.get('source_name', 'Unknown source')}",
                     f"Type: {result.get('source_type', 'Unknown type')}",
                     f"Date: {result.get('date_display') or result.get('timestamp') or 'No date'}",
-                    f"Excerpt: {_trim(result.get('excerpt') or result.get('text', ''), 700)}",
+                    f"Evidence Card citation: [{index}]",
+                    f"Matched quote: {_trim(result.get('matched_quote') or result.get('excerpt') or result.get('text', ''), 700)}",
                 ]
             )
         )
 
     prompt = (
-        "Summarize the search query using only the trusted results below. "
-        "Do not add outside facts. If the results are limited, say so. "
+        "Summarize the search query using only the Evidence Cards below. "
+        "Cite supporting Evidence Cards with bracketed citation numbers. "
+        "Do not add outside facts. If evidence is missing, say Not found in trusted sources. "
         f"Style: {style}. Query: {query}\n\n" + "\n\n".join(context_blocks)
     )
 
@@ -79,7 +81,7 @@ def _llm_summary(query: str, results: list[dict[str, Any]], style: str) -> str |
             input=[
                 {
                     "role": "system",
-                    "content": "You help journalists summarize trusted search results without adding outside information.",
+                    "content": "You help journalists summarize retrieved Evidence Cards without adding outside information or invented facts.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -95,10 +97,10 @@ def generate_summary(query: str, results: list[dict[str, Any]], style: str) -> d
         return {
             "summary": llm_output.strip(),
             "mode": "LLM summary",
-            "notice": "Generated from the trusted results shown on this page.",
+            "notice": "Generated only from retrieved Evidence Cards shown on this page.",
         }
     return {
         "summary": _fallback_summary(query, results, style),
         "mode": "Fallback extractive summary",
-        "notice": "No LLM API key or compatible OpenAI client was available, so Lookitup used top result excerpts.",
+        "notice": "No LLM API key or compatible OpenAI client was available, so Lookitup used top Evidence Card quotes.",
     }

@@ -9,6 +9,9 @@ env/
 .env
 .streamlit/secrets.toml
 .streamlit.pid
+data/*.db
+data/*.sqlite
+data/*.sqlite3
 
 .DS_Store
 Thumbs.db

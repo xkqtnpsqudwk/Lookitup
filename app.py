@@ -8,25 +8,40 @@ import streamlit as st
 from PIL import Image
 
 from utils.exif_tools import extract_exif
-from utils.search import search_sources
+from utils.search_index import (
+    build_evidence_index_stats,
+    evaluate_search_state,
+    group_evidence_cards,
+    search_evidence_cards,
+)
 from utils.source_loader import load_pdf, load_rss_feed, load_website, make_source_record
-from utils.storage import add_sources, clear_saved_sources, ensure_data_files, get_all_sources, load_saved_sources
+from utils.storage import (
+    add_sources,
+    clear_saved_sources,
+    ensure_data_files,
+    get_sources_for_pack,
+    load_saved_sources,
+    load_source_packs,
+)
 from utils.summarizer import generate_summary
 
 
 IMPORTANT_TEXT = "Lookitup is not an AI truth machine. It helps journalists search faster inside sources they already trust."
 CORE_MESSAGE = "Google searches the open web. Lookitup searches your trusted world."
-AI_SCOPE_TEXT = "AI summaries are generated only from the trusted results shown on this page."
-NO_RESULTS_TEXT = "No result found does not mean the claim is false. It only means Lookitup could not find it inside your selected trusted sources."
+AI_SCOPE_TEXT = "AI summaries are generated only from retrieved Evidence Cards shown on this page."
+NOT_FOUND_TEXT = "Not found in trusted sources."
 IMAGE_FLAG_TEXT = "Image flagging does not prove an image is fake. It only marks it as needing additional verification."
 
 
 def initialize_state() -> None:
     ensure_data_files()
     st.session_state.setdefault("include_sample_sources", True)
-    st.session_state.setdefault("last_query", "Iran Israel rockets")
-    st.session_state.setdefault("last_sort", "relevance")
-    st.session_state.setdefault("last_results", [])
+    st.session_state.setdefault("selected_pack_id", "international-breaking-news")
+    st.session_state.setdefault("last_claim", "Iran Israel rockets")
+    st.session_state.setdefault("last_sort", "BM25 relevance")
+    st.session_state.setdefault("last_pack_id", "international-breaking-news")
+    st.session_state.setdefault("last_cards", [])
+    st.session_state.setdefault("last_state", None)
     st.session_state.setdefault("last_summary", None)
     st.session_state.setdefault("image_flagged", False)
     st.session_state.setdefault("current_image_name", "")
@@ -42,26 +57,16 @@ def page_styles() -> None:
         div[data-testid="stMarkdownContainer"] h2,
         div[data-testid="stMarkdownContainer"] h3,
         div[data-testid="stMarkdownContainer"] h4,
-        div[data-testid="stMarkdownContainer"] h5,
-        div[data-testid="stMarkdownContainer"] h6,
         div[data-testid="stMarkdownContainer"] p,
         div[data-testid="stWidgetLabel"] *,
         label,
         input,
-        textarea {
-            color: #111827;
-        }
-        div[data-testid="stCaptionContainer"],
-        div[data-testid="stCaptionContainer"] * {
-            color: #475569;
-        }
+        textarea { color: #111827; }
+        div[data-testid="stCaptionContainer"], div[data-testid="stCaptionContainer"] * { color: #475569; }
         div[data-testid="stTextInput"] input,
         div[data-testid="stTextArea"] textarea {
             background: #ffffff;
             border-color: #cbd5e1;
-            color: #111827;
-        }
-        div[data-testid="stFileUploader"] {
             color: #111827;
         }
         div[data-baseweb="select"] div {
@@ -97,21 +102,13 @@ def page_styles() -> None:
             color: #111827;
         }
         div[data-testid="stButton"] button[kind="secondary"] * { color: #111827; }
-        div[data-testid="stMetric"] {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 0.75rem 0.85rem;
-        }
-        div[data-testid="stMetric"] * { color: #111827; }
         .lookitup-hero {
             background: #ffffff;
             border: 1px solid #dbe4ee;
             border-left: 5px solid #0f766e;
             border-radius: 8px;
             padding: 0.85rem 1rem;
-            margin-bottom: 0.65rem;
-            margin-top: 0.15rem;
+            margin: 0.15rem 0 0.65rem 0;
         }
         .hero-kicker {
             color: #0f766e;
@@ -132,7 +129,7 @@ def page_styles() -> None:
             color: #334155;
             font-size: 0.98rem;
             margin-top: 0.35rem;
-            max-width: 760px;
+            max-width: 850px;
         }
         .flow-grid {
             display: grid;
@@ -158,12 +155,13 @@ def page_styles() -> None:
             font-weight: 720;
             margin-top: 0.1rem;
         }
-        .flow-copy {
-            color: #475569;
-            font-size: 0.84rem;
-            margin-top: 0.18rem;
-            line-height: 1.32;
-            display: none;
+        .section-note {
+            background: #ecfdf5;
+            border: 1px solid #bbf7d0;
+            color: #14532d;
+            border-radius: 8px;
+            padding: 0.75rem 0.9rem;
+            margin-bottom: 0.8rem;
         }
         .stat-grid {
             display: grid;
@@ -188,15 +186,7 @@ def page_styles() -> None:
             font-weight: 760;
             margin-top: 0.15rem;
         }
-        .section-note {
-            background: #ecfdf5;
-            border: 1px solid #bbf7d0;
-            color: #14532d;
-            border-radius: 8px;
-            padding: 0.75rem 0.9rem;
-            margin-bottom: 0.8rem;
-        }
-        .result-card {
+        .evidence-card {
             border: 1px solid #dbe4ee;
             border-left: 4px solid #0f766e;
             border-radius: 8px;
@@ -204,7 +194,7 @@ def page_styles() -> None:
             margin: 0.85rem 0;
             background: #ffffff;
         }
-        .result-topline {
+        .card-topline {
             display: flex;
             flex-wrap: wrap;
             gap: 0.4rem;
@@ -221,28 +211,28 @@ def page_styles() -> None:
             padding: 0.16rem 0.48rem;
             border-radius: 999px;
         }
-        .badge-trusted { color: #115e59; background: #ccfbf1; border-color: #99f6e4; }
-        .badge-warning { color: #854d0e; background: #fef3c7; border-color: #fde68a; }
-        .result-title {
+        .badge-evidence { color: #115e59; background: #ccfbf1; border-color: #99f6e4; }
+        .badge-state { color: #854d0e; background: #fef3c7; border-color: #fde68a; }
+        .card-title {
+            color: #111827;
             font-size: 1.12rem;
             font-weight: 760;
-            color: #111827;
             margin: 0.2rem 0 0.35rem 0;
         }
-        .result-meta {
+        .card-meta {
             color: #475569;
             font-size: 0.9rem;
             line-height: 1.45;
             margin-bottom: 0.65rem;
         }
-        .result-excerpt {
+        .quote-box {
             color: #1f2937;
             line-height: 1.55;
             background: #f8fafc;
             border-radius: 8px;
             padding: 0.75rem 0.85rem;
         }
-        .result-footer {
+        .card-footer {
             color: #475569;
             font-size: 0.86rem;
             margin-top: 0.65rem;
@@ -254,18 +244,10 @@ def page_styles() -> None:
             padding: 0.75rem 0.85rem;
             margin-bottom: 0.6rem;
         }
-        .mini-title {
-            color: #111827;
-            font-weight: 720;
-            margin-bottom: 0.2rem;
-        }
-        .mini-copy {
-            color: #475569;
-            font-size: 0.9rem;
-            line-height: 1.4;
-        }
+        .mini-title { color: #111827; font-weight: 720; margin-bottom: 0.2rem; }
+        .mini-copy { color: #475569; font-size: 0.9rem; line-height: 1.4; }
         @media (max-width: 800px) {
-            .flow-grid { grid-template-columns: 1fr; }
+            .flow-grid, .stat-grid { grid-template-columns: 1fr; }
             .lookitup-title { font-size: 1.65rem; }
         }
         </style>
@@ -278,7 +260,7 @@ def render_header() -> None:
     st.markdown(
         f"""
         <div class="lookitup-hero">
-          <div class="hero-kicker">Trusted-source search for journalists</div>
+          <div class="hero-kicker">Controlled retrieval before publication</div>
           <div class="lookitup-title">Lookitup</div>
           <div class="lookitup-tagline">
             Having a doubt? Just Lookitup. {html.escape(CORE_MESSAGE)}
@@ -287,18 +269,15 @@ def render_header() -> None:
         <div class="flow-grid">
           <div class="flow-card">
             <div class="flow-step">Step 1</div>
-            <div class="flow-title">Add trusted sources</div>
-            <div class="flow-copy">Import RSS, websites, PDFs, or manual notes into one searchable library.</div>
+            <div class="flow-title">Select source pack</div>
           </div>
           <div class="flow-card">
             <div class="flow-step">Step 2</div>
-            <div class="flow-title">Search only that library</div>
-            <div class="flow-copy">Keyword search stays fast and does not scan the open web.</div>
+            <div class="flow-title">Search a claim</div>
           </div>
           <div class="flow-card">
             <div class="flow-step">Step 3</div>
-            <div class="flow-title">Summarize if useful</div>
-            <div class="flow-copy">AI is optional and uses only the trusted results already shown.</div>
+            <div class="flow-title">Review Evidence Cards</div>
           </div>
         </div>
         """,
@@ -310,81 +289,126 @@ def render_section_note(text: str) -> None:
     st.markdown(f'<div class="section-note">{html.escape(text)}</div>', unsafe_allow_html=True)
 
 
+def source_pack_map() -> dict[str, dict[str, Any]]:
+    return {pack["id"]: pack for pack in load_source_packs()}
+
+
+def pack_name(pack_id: str) -> str:
+    pack = source_pack_map().get(pack_id, {})
+    return pack.get("name", pack_id)
+
+
+def pack_selector(label: str, key: str) -> str:
+    packs = load_source_packs()
+    if not packs:
+        st.warning("No preset source packs are configured.")
+        return ""
+    pack_ids = [pack["id"] for pack in packs]
+    current = st.session_state.selected_pack_id
+    index = pack_ids.index(current) if current in pack_ids else 0
+    selected = st.selectbox(
+        label,
+        pack_ids,
+        index=index,
+        format_func=lambda pack_id: source_pack_map()[pack_id]["name"],
+        key=key,
+    )
+    st.session_state.selected_pack_id = selected
+    return selected
+
+
+def selected_pack_sources(pack_id: str) -> list[dict[str, Any]]:
+    return get_sources_for_pack(pack_id, st.session_state.include_sample_sources)
+
+
+def stamp_sources(records: list[dict[str, Any]], pack_id: str, trust_label: str) -> list[dict[str, Any]]:
+    stamped = []
+    for record in records:
+        source = dict(record)
+        source["pack_id"] = pack_id
+        source["trust_label"] = trust_label.strip() or "Trusted source"
+        stamped.append(source)
+    return stamped
+
+
 def source_summary_rows(sources: list[dict[str, Any]]) -> list[dict[str, str]]:
     rows = []
     for source in sources:
         rows.append(
             {
-                "Name": source.get("source_name", "Untitled source"),
+                "Source": source.get("source_name", "Untitled source"),
+                "Pack": pack_name(source.get("pack_id", "")),
                 "Type": source.get("source_type", "Unknown"),
-                "Title": source.get("title", ""),
+                "Trust label": source.get("trust_label", "Trusted source"),
                 "Date": source.get("timestamp") or "No date",
-                "Library": source.get("library", "saved"),
+                "Title": source.get("title", ""),
             }
         )
     return rows
 
 
-def source_type_text(sources: list[dict[str, Any]]) -> str:
-    counts = Counter(source.get("source_type", "Unknown") for source in sources)
-    if not counts:
-        return "No source types yet"
-    return ", ".join(f"{source_type}: {count}" for source_type, count in sorted(counts.items()))
-
-
-def render_library_metrics(sources: list[dict[str, Any]], saved_sources: list[dict[str, Any]]) -> None:
-    sample_count = sum(1 for source in sources if source.get("library") == "sample")
+def render_pack_stats(sources: list[dict[str, Any]]) -> None:
+    stats = build_evidence_index_stats(sources)
+    type_counts = Counter(source.get("source_type", "Unknown") for source in sources)
     st.markdown(
         f"""
         <div class="stat-grid">
           <div class="stat-card">
-            <div class="stat-label">Searchable records</div>
-            <div class="stat-value">{len(sources)}</div>
+            <div class="stat-label">Documents</div>
+            <div class="stat-value">{stats["documents"]}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Saved by user</div>
-            <div class="stat-value">{len(saved_sources)}</div>
+            <div class="stat-label">Text chunks</div>
+            <div class="stat-value">{stats["chunks"]}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Sample records</div>
-            <div class="stat-value">{sample_count}</div>
+            <div class="stat-label">Source types</div>
+            <div class="stat-value">{len(type_counts)}</div>
           </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.caption(source_type_text(sources))
+    if type_counts:
+        st.caption(", ".join(f"{name}: {count}" for name, count in sorted(type_counts.items())))
 
 
-def render_add_source_panel() -> None:
+def render_add_source_form(pack_id: str) -> None:
     with st.container(border=True):
-        st.markdown("#### Add One Trusted Source")
-        st.caption("Choose the source type first, then fill only the fields needed for that type.")
+        st.markdown("#### Add Trusted Source to Pack")
+        st.caption("Live URL/RSS ingestion is useful for demos; local sample text keeps the fallback reliable.")
         source_kind = st.radio(
             "Source type",
-            ["RSS feed", "Website URL", "PDF upload", "Manual text"],
+            ["URL", "RSS", "Local sample text", "PDF"],
             horizontal=True,
         )
 
         with st.form("source_form"):
-            source_name = st.text_input("Source name", placeholder="Example: Newsroom archive")
+            source_name = st.text_input("Source name", placeholder="Example: Ministry page or trusted wire")
+            trust_label = st.text_input("Trust label", value="Trusted source")
+            url = ""
+            rss_limit = 8
+            pdf_file = None
+            title = ""
+            timestamp = ""
+            text = ""
 
-            if source_kind == "RSS feed":
-                rss_url = st.text_input("RSS feed URL", placeholder="https://example.com/feed.xml")
+            if source_kind == "URL":
+                url = st.text_input("Article or official page URL", placeholder="https://example.com/article")
+                submit_label = "Add URL source"
+            elif source_kind == "RSS":
+                url = st.text_input("RSS feed URL", placeholder="https://example.com/feed.xml")
                 rss_limit = st.slider("Entries to import", min_value=1, max_value=20, value=8)
                 submit_label = "Add RSS entries"
-            elif source_kind == "Website URL":
-                website_url = st.text_input("Website URL", placeholder="https://example.com/article")
-                submit_label = "Add website page"
-            elif source_kind == "PDF upload":
+            elif source_kind == "PDF":
                 pdf_file = st.file_uploader("PDF file", type=["pdf"], key="source_pdf_file")
-                submit_label = "Add PDF"
+                submit_label = "Add PDF source"
             else:
-                manual_title = st.text_input("Title", placeholder="Briefing note title")
-                manual_url = st.text_input("Optional source link")
-                manual_timestamp = st.text_input("Optional date", placeholder="2026-06-18T09:30:00Z")
-                manual_text = st.text_area("Text content", height=190)
-                submit_label = "Add manual text"
+                title = st.text_input("Title", placeholder="Local fallback sample title")
+                url = st.text_input("Optional URL")
+                timestamp = st.text_input("Optional date", placeholder="2026-06-18T09:30:00Z")
+                text = st.text_area("Text content", height=170)
+                submit_label = "Add local sample text"
 
             submitted = st.form_submit_button(submit_label, type="primary", use_container_width=True)
 
@@ -392,262 +416,248 @@ def render_add_source_panel() -> None:
             return
 
         try:
-            if source_kind == "RSS feed":
-                if not rss_url.strip():
-                    st.error("Add a valid RSS feed URL first.")
+            if source_kind == "URL":
+                if not url.strip():
+                    st.error("Add a valid URL first.")
                     return
-                records = load_rss_feed(rss_url.strip(), source_name, rss_limit)
-                count = add_sources(records)
-                st.success(f"Added {count} RSS entries to trusted sources.")
-            elif source_kind == "Website URL":
-                if not website_url.strip():
-                    st.error("Add a valid website URL first.")
+                records = [load_website(url.strip(), source_name)]
+            elif source_kind == "RSS":
+                if not url.strip():
+                    st.error("Add a valid RSS URL first.")
                     return
-                record = load_website(website_url.strip(), source_name)
-                add_sources([record])
-                st.success("Added website text to trusted sources.")
-            elif source_kind == "PDF upload":
+                records = load_rss_feed(url.strip(), source_name, rss_limit)
+            elif source_kind == "PDF":
                 if not pdf_file:
                     st.error("Upload a PDF first.")
                     return
-                record = load_pdf(pdf_file.getvalue(), pdf_file.name, source_name)
-                add_sources([record])
-                st.success("Added PDF text to trusted sources.")
+                records = [load_pdf(pdf_file.getvalue(), pdf_file.name, source_name)]
             else:
-                if not manual_text.strip():
-                    st.error("Add text content first.")
+                if not text.strip():
+                    st.error("Add local sample text first.")
                     return
-                record = make_source_record(
-                    source_name=source_name or manual_title or "Manual source",
-                    source_type="Manual text",
-                    source_url=manual_url,
-                    title=manual_title or source_name or "Manual text source",
-                    timestamp=manual_timestamp,
-                    text=manual_text,
-                )
-                add_sources([record])
-                st.success("Added manual text to trusted sources.")
+                records = [
+                    make_source_record(
+                        source_name=source_name or title or "Local sample text",
+                        source_type="Local sample text",
+                        source_url=url,
+                        title=title or source_name or "Local sample text",
+                        timestamp=timestamp,
+                        text=text,
+                    )
+                ]
+            count = add_sources(stamp_sources(records, pack_id, trust_label))
+            st.success(f"Added {count} source record(s) to {pack_name(pack_id)}.")
         except ValueError as exc:
             st.error(str(exc))
 
 
-def render_library_control_panel(sources: list[dict[str, Any]], saved_sources: list[dict[str, Any]]) -> None:
-    with st.container(border=True):
-        st.markdown("#### Library Status")
-        render_library_metrics(sources, saved_sources)
-        st.divider()
-        st.checkbox(
-            "Include sample demo sources",
-            key="include_sample_sources",
-            help="Keep this on for a reliable offline demo.",
-        )
-        st.caption("Demo query: Iran Israel rockets")
-        if st.button("Clear saved sources", type="secondary", use_container_width=True):
-            clear_saved_sources()
-            st.success("Saved trusted sources cleared. Sample demo sources were left unchanged.")
-            st.rerun()
+def render_source_packs_tab() -> None:
+    st.subheader("Source Packs")
+    render_section_note("A journalist starts by selecting a preset source pack, so setup time stays out of the pitch.")
 
+    pack_col, add_col = st.columns([0.9, 1.15], gap="large")
+    with pack_col:
+        with st.container(border=True):
+            st.markdown("#### Preset Source Pack")
+            pack_id = pack_selector("Pack", "setup_pack_selector")
+            pack = source_pack_map().get(pack_id, {})
+            st.write(pack.get("description", "No description."))
+            st.checkbox(
+                "Include local sample fallback corpus",
+                key="include_sample_sources",
+                help="Keeps the demo reliable without network access.",
+            )
+            sources = selected_pack_sources(pack_id)
+            render_pack_stats(sources)
+            if st.button("Clear saved sources", type="secondary", use_container_width=True):
+                clear_saved_sources()
+                st.success("Saved sources cleared. Sample pack data was left unchanged.")
+                st.rerun()
+        render_add_source_form(pack_id)
 
-def render_source_list(sources: list[dict[str, Any]]) -> None:
-    st.markdown("#### Trusted Source List")
-    if not sources:
-        st.warning("Your trusted source library is empty. Add a source or enable sample demo sources.")
-        return
-
-    type_options = sorted({source.get("source_type", "Unknown") for source in sources})
-    selected_types = st.multiselect("Filter by source type", type_options, default=type_options)
-    filtered_sources = [
-        source for source in sources if source.get("source_type", "Unknown") in selected_types
-    ]
-    if not filtered_sources:
-        st.info("No sources match the selected filters.")
-        return
-    st.dataframe(source_summary_rows(filtered_sources), use_container_width=True, hide_index=True)
-
-
-def render_source_setup_tab() -> None:
-    st.subheader("Source Setup")
-    render_section_note(IMPORTANT_TEXT)
-
-    sources = get_all_sources(st.session_state.include_sample_sources)
-    saved_sources = load_saved_sources()
-    add_col, status_col = st.columns([1.35, 0.9], gap="large")
     with add_col:
-        render_add_source_panel()
-    with status_col:
-        render_library_control_panel(sources, saved_sources)
+        st.markdown("#### Pack Corpus")
+        sources = selected_pack_sources(st.session_state.selected_pack_id)
+        if not sources:
+            st.warning("This source pack has no corpus yet. Add a URL/RSS/local source or enable sample fallback.")
+        else:
+            st.dataframe(source_summary_rows(sources), use_container_width=True, hide_index=True)
+        saved_count = len(load_saved_sources())
+        st.caption(f"{saved_count} saved source records across all packs.")
 
-    render_source_list(get_all_sources(st.session_state.include_sample_sources))
+
+def run_claim_search(claim: str, pack_id: str, sort_by: str) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    sources = selected_pack_sources(pack_id)
+    cards = search_evidence_cards(claim, sources, limit=12, sort_by=sort_by)
+    state = evaluate_search_state(claim, cards)
+    st.session_state.last_claim = claim
+    st.session_state.last_sort = sort_by
+    st.session_state.selected_pack_id = pack_id
+    st.session_state.last_pack_id = pack_id
+    st.session_state.last_cards = cards
+    st.session_state.last_state = state
+    st.session_state.last_summary = None
+    return cards, state
 
 
-def result_card(result: dict[str, Any]) -> None:
-    source_name = html.escape(result.get("source_name", "Untitled source"))
-    source_type = html.escape(result.get("source_type", "Unknown type"))
-    title = html.escape(result.get("title") or result.get("source_name", "Untitled source"))
-    date_display = html.escape(result.get("date_display", "No date"))
-    recency = html.escape(result.get("recency", "No date"))
-    excerpt = html.escape(result.get("excerpt") or "No excerpt available.")
-    explanation = html.escape(result.get("explanation", "Keyword found in this source."))
-    source_url = result.get("source_url", "")
-    score = html.escape(str(result.get("score", 0)))
-    match_count = html.escape(str(result.get("match_count", 0)))
-    exact_count = html.escape(str(result.get("exact_match_count", 0)))
-    term_count = html.escape(str(result.get("term_match_count", 0)))
-    recency_class = "badge-trusted" if result.get("recency") == "Recent" else "badge-warning"
+def render_state_message(state: dict[str, str]) -> None:
+    if state["status"] == "evidence_found":
+        st.success(state["message"])
+    elif state["status"] == "mismatch":
+        st.warning(state["message"])
+    else:
+        st.error(state["message"])
+        st.caption("This means the selected trusted source pack currently lacks support for the claim.")
+
+
+def render_evidence_card(card: dict[str, Any], index: int) -> None:
+    source_name = html.escape(card.get("source_name", "Untitled source"))
+    source_type = html.escape(card.get("source_type", "Unknown type"))
+    title = html.escape(card.get("title", source_name))
+    date_display = html.escape(card.get("date_display", "No date"))
+    trust_label = html.escape(card.get("trust_label", "Trusted source"))
+    matched_quote = html.escape(card.get("matched_quote", ""))
+    score = html.escape(str(card.get("score", 0)))
+    match_count = html.escape(str(card.get("match_count", 0)))
+    url = card.get("url", "")
     link_html = (
-        f'<a href="{html.escape(source_url)}" target="_blank" rel="noreferrer">Open source</a>'
-        if source_url
-        else "No source link"
+        f'<a href="{html.escape(url)}" target="_blank" rel="noreferrer">Open source</a>'
+        if url
+        else "No URL"
     )
-
     st.markdown(
         f"""
-        <div class="result-card">
-          <div class="result-topline">
-            <span class="badge badge-trusted">Trusted Result Card</span>
+        <div class="evidence-card">
+          <div class="card-topline">
+            <span class="badge badge-evidence">Evidence Card {index}</span>
             <span class="badge">{source_type}</span>
-            <span class="badge {recency_class}">{recency}</span>
+            <span class="badge">{trust_label}</span>
           </div>
-          <div class="result-title">{title}</div>
-          <div class="result-meta">
-            {source_name} - {date_display} - {link_html}
-          </div>
-          <div class="result-excerpt">{excerpt}</div>
-          <div class="result-footer">
-            Matches: {match_count} - Exact phrase: {exact_count} - Keyword hits: {term_count} - Score: {score}
-            <br>{explanation}
-          </div>
+          <div class="card-title">{title}</div>
+          <div class="card-meta">{source_name} - {date_display} - {link_html}</div>
+          <div class="quote-box">{matched_quote}</div>
+          <div class="card-footer">Ranking score: {score} - Keyword hits: {match_count} - Chunk #{card.get("chunk_index", 1)}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def run_search(query: str, sort_by: str) -> list[dict[str, Any]]:
-    sources = get_all_sources(st.session_state.include_sample_sources)
-    results = search_sources(query, sources, sort_by)
-    st.session_state.last_query = query
-    st.session_state.last_sort = sort_by
-    st.session_state.last_results = results
-    st.session_state.last_summary = None
-    return results
+def render_grouped_evidence(cards: list[dict[str, Any]]) -> None:
+    groups = group_evidence_cards(cards)
+    st.info("Evidence grouped by source and time.")
+    for group in groups:
+        with st.expander(f"{group['source_name']} - {group['date']} - {group['count']} card(s)", expanded=False):
+            for card in group["cards"]:
+                st.write(f"Score {card.get('score', 0)}: {card.get('title', '')}")
+                st.caption(card.get("matched_quote", ""))
 
 
-def render_search_toolbar() -> tuple[str, str, bool]:
-    with st.container(border=True):
-        st.markdown("#### Search Workspace")
-        st.caption("This search scans only the trusted source library. It does not search the open web.")
-        query_col, sort_col = st.columns([3, 1])
-        with query_col:
-            query = st.text_input(
-                "Keyword or topic",
-                value=st.session_state.last_query,
-                placeholder="Iran Israel rockets",
-            )
-        with sort_col:
-            sort_by = st.selectbox(
-                "Sort",
-                ["relevance", "newest first"],
-                index=0 if st.session_state.last_sort == "relevance" else 1,
-            )
-        search_clicked = st.button("Search trusted sources", type="primary", use_container_width=True)
-    return query, sort_by, search_clicked
+def render_claim_search_tab() -> None:
+    st.subheader("Claim Search")
+    render_section_note("Search a text claim only inside the selected trusted source pack. Results are Evidence Cards, not final truth labels.")
 
-
-def render_results_overview(query: str, results: list[dict[str, Any]]) -> None:
-    source_count = len({result.get("source_name") for result in results})
-    recent_count = sum(1 for result in results if result.get("recency") == "Recent")
-    top_score = max((result.get("score", 0) for result in results), default=0)
-
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Results", len(results))
-    col2.metric("Sources", source_count)
-    col3.metric("Recent", recent_count)
-    col4.metric("Top score", top_score)
-
-    action_col, note_col = st.columns([1.1, 2])
-    with action_col:
-        if st.button("Generate AI Summary from Trusted Results", use_container_width=True):
-            summary = generate_summary(query, results, "short paragraph")
-            st.session_state.last_summary = summary
-            st.success(summary["mode"])
-            st.write(summary["summary"])
-    with note_col:
-        st.caption(AI_SCOPE_TEXT)
-        st.caption("Main search is keyword-based. AI runs only when you click the summary button.")
-
-
-def render_search_tab() -> None:
-    st.subheader("Search")
-    render_section_note(CORE_MESSAGE)
-    sources = get_all_sources(st.session_state.include_sample_sources)
-    if not sources:
-        st.warning("Your source library is empty. Add sources in Source Setup first.")
+    packs = load_source_packs()
+    if not packs:
+        st.warning("No preset source packs are configured.")
         return
 
-    query, sort_by, search_clicked = render_search_toolbar()
+    with st.container(border=True):
+        pack_col, sort_col = st.columns([2, 1], gap="large")
+        with pack_col:
+            pack_id = pack_selector("Preset source pack", "search_pack_selector")
+        with sort_col:
+            sort_by = st.selectbox("Sort", ["BM25 relevance", "newest first"], key="search_sort")
+
+        claim = st.text_area(
+            "Text claim or keyword query",
+            value=st.session_state.last_claim,
+            height=90,
+            placeholder="Iran Israel rockets",
+        )
+        group_breaking_news = st.checkbox("Group breaking-news evidence by source and time")
+        search_clicked = st.button("Search selected source pack", type="primary", use_container_width=True)
+
     should_search = (
         search_clicked
-        or query != st.session_state.last_query
+        or claim != st.session_state.last_claim
         or sort_by != st.session_state.last_sort
-        or not st.session_state.last_results
+        or pack_id != st.session_state.last_pack_id
+        or not st.session_state.last_state
     )
-    results = run_search(query, sort_by) if should_search else st.session_state.last_results
+    cards, state = run_claim_search(claim, pack_id, sort_by) if should_search else (st.session_state.last_cards, st.session_state.last_state)
 
-    if not query.strip():
-        st.info("Enter a keyword or topic to search inside trusted sources.")
-        return
-    if not results:
-        st.warning(NO_RESULTS_TEXT)
+    if not claim.strip():
+        st.info("Enter a claim or keyword query first.")
         return
 
-    st.markdown(f"#### Results for `{query}`")
-    render_results_overview(query, results)
-    for result in results:
-        result_card(result)
+    stats = build_evidence_index_stats(selected_pack_sources(pack_id))
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Evidence Cards", len(cards))
+    col2.metric("Indexed documents", stats["documents"])
+    col3.metric("Indexed chunks", stats["chunks"])
+    col4.metric("State", state["label"])
+
+    render_state_message(state)
+
+    if state["status"] == "not_found":
+        return
+
+    if group_breaking_news:
+        render_grouped_evidence(cards)
+
+    for index, card in enumerate(cards, start=1):
+        render_evidence_card(card, index)
 
 
-def render_result_mini_card(index: int, result: dict[str, Any]) -> None:
-    title = html.escape(result.get("title") or result.get("source_name", "Trusted source"))
-    source = html.escape(result.get("source_name", "Trusted source"))
-    date = html.escape(result.get("date_display") or result.get("timestamp") or "No date")
-    excerpt = html.escape(result.get("excerpt") or "")
+def render_result_mini_card(index: int, card: dict[str, Any]) -> None:
+    title = html.escape(card.get("title") or card.get("source_name", "Evidence"))
+    source = html.escape(card.get("source_name", "Trusted source"))
+    date = html.escape(card.get("date_display") or card.get("timestamp") or "No date")
+    quote = html.escape(card.get("matched_quote") or "")
     st.markdown(
         f"""
         <div class="mini-card">
-          <div class="mini-title">{index}. {title}</div>
+          <div class="mini-title">[{index}] {title}</div>
           <div class="mini-copy">{source} - {date}</div>
-          <div class="mini-copy">{excerpt}</div>
+          <div class="mini-copy">{quote}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-def render_ai_summary_tab() -> None:
-    st.subheader("AI Summary")
+def render_evidence_summary_tab() -> None:
+    st.subheader("Evidence Summary")
     render_section_note(AI_SCOPE_TEXT)
-    query = st.session_state.get("last_query", "")
-    results = st.session_state.get("last_results", [])
-    if not query or not results:
+
+    claim = st.session_state.get("last_claim", "")
+    cards = st.session_state.get("last_cards", [])
+    state = st.session_state.get("last_state")
+    if not claim or not state:
         with st.container(border=True):
-            st.warning("Run a search first. The summary can only use trusted results already shown in Search.")
+            st.warning("Run a claim search first.")
             st.caption("Recommended demo query: Iran Israel rockets")
         return
 
-    top_results = results[:5]
+    if state["status"] == "not_found" or not cards:
+        st.error(NOT_FOUND_TEXT)
+        st.caption("The summary is blocked because no retrieved Evidence Cards are available.")
+        return
+
+    top_cards = cards[:5]
     control_col, context_col = st.columns([0.9, 1.2], gap="large")
     with control_col:
         with st.container(border=True):
             st.markdown("#### Summary Controls")
-            st.caption(f"Current query: {query}")
-            st.metric("Trusted results used", len(top_results))
+            st.caption(f"Claim: {claim}")
+            st.metric("Evidence Cards used", len(top_cards))
             style = st.radio("Summary format", ["short paragraph", "bullet points", "timeline"])
-            if st.button("Generate summary", type="primary", use_container_width=True):
-                summary = generate_summary(query, top_results, style)
+            if st.button("Generate evidence-grounded summary", type="primary", use_container_width=True):
+                summary = generate_summary(claim, top_cards, style)
                 st.session_state.last_summary = summary
                 st.success(summary["mode"])
-            st.caption("No outside web content is added to this summary.")
+            st.caption("Outside knowledge and invented facts are blocked by prompt and fallback design.")
 
         if st.session_state.last_summary:
             with st.container(border=True):
@@ -656,9 +666,9 @@ def render_ai_summary_tab() -> None:
                 st.caption(st.session_state.last_summary["notice"])
 
     with context_col:
-        st.markdown("#### Trusted Results Used")
-        for index, result in enumerate(top_results, start=1):
-            render_result_mini_card(index, result)
+        st.markdown("#### Evidence Cards Used")
+        for index, card in enumerate(top_cards, start=1):
+            render_result_mini_card(index, card)
 
 
 def render_image_quick_checks(details: dict[str, Any]) -> None:
@@ -680,9 +690,10 @@ def render_image_quick_checks(details: dict[str, Any]) -> None:
 
 def render_images_tab() -> None:
     st.subheader("Images")
-    render_section_note("For this MVP, Lookitup reads local image metadata. It does not implement SynthID detection.")
+    render_section_note("Image provenance is later scope for this technical branch. This MVP only reads local EXIF metadata.")
 
     upload_col, review_col = st.columns([1.05, 1], gap="large")
+    uploaded_image = None
     with upload_col:
         with st.container(border=True):
             st.markdown("#### Upload and Preview")
@@ -706,8 +717,7 @@ def render_images_tab() -> None:
                 st.caption("Waiting for an image.")
                 return
 
-            image_bytes = uploaded_image.getvalue()
-            details = extract_exif(image_bytes)
+            details = extract_exif(uploaded_image.getvalue())
             render_image_quick_checks(details)
 
             if details["warnings"]:
@@ -740,8 +750,8 @@ def render_about_tab() -> None:
         st.markdown("#### What Lookitup Is")
         st.write(IMPORTANT_TEXT)
         st.write(CORE_MESSAGE)
-        st.write("Lookitup is not a Google replacement and it is not an AI truth machine.")
-        st.write("It searches only inside sources selected by the journalist. Journalists make the final decision.")
+        st.write("Lookitup is a controlled retrieval pipeline: preset source packs are ingested, chunked, indexed with SQLite FTS5, and searched before publication.")
+        st.write("It returns Evidence Cards, mismatch or not-found states, and grouped breaking-news evidence. Journalists make the final decision.")
 
 
 def main() -> None:
@@ -751,14 +761,14 @@ def main() -> None:
     render_header()
 
     source_tab, search_tab, summary_tab, images_tab, about_tab = st.tabs(
-        ["1 Source Setup", "2 Search", "3 AI Summary", "4 Images", "5 About"]
+        ["1 Source Packs", "2 Claim Search", "3 Evidence Summary", "4 Images", "5 About"]
     )
     with source_tab:
-        render_source_setup_tab()
+        render_source_packs_tab()
     with search_tab:
-        render_search_tab()
+        render_claim_search_tab()
     with summary_tab:
-        render_ai_summary_tab()
+        render_evidence_summary_tab()
     with images_tab:
         render_images_tab()
     with about_tab:
