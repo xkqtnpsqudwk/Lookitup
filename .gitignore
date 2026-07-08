@@ -13,6 +13,7 @@ env/
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+backend/data/trusted_sources.local.json
 
 .idea/
 frontend/node_modules/

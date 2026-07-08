@@ -83,11 +83,16 @@ backend/
 │  ├─ search_service.py        keyword search, scoring, excerpts
 │  └─ summary_service.py       optional OpenAI summary of trusted results
 └─ data/
-   ├─ trusted_sources.json     saved sources (starts empty)
+   ├─ trusted_sources.json     tracked seed data
+   ├─ trusted_sources.local.json ignored runtime data, created on first write
    └─ sample_sources.json      demo corpus
 ```
 
 ## Storage model
+
+Runtime sources are written to `backend/data/trusted_sources.local.json`, which
+is ignored by Git. The tracked `trusted_sources.json` is only used as initial
+seed data when the local runtime file does not exist yet.
 
 Each source owns a list of searchable `items`:
 

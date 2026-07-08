@@ -52,7 +52,7 @@ lookitup/
    ├─ main.py         API endpoints
    ├─ models/         Pydantic schemas
    ├─ services/       source, search, extractor, storage
-   └─ data/           trusted_sources.json, sample_sources.json
+   └─ data/           trusted_sources.json seed, ignored trusted_sources.local.json runtime, sample_sources.json
 ```
 
 ## Install & run
@@ -66,6 +66,9 @@ uvicorn main:app --reload
 ```
 
 The API runs at `http://localhost:8000` (OpenAPI docs at `/docs`).
+
+Runtime sources are saved to `backend/data/trusted_sources.local.json`, which is
+ignored by Git. The tracked `trusted_sources.json` is only the initial seed.
 
 **Frontend:**
 

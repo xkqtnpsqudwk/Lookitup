@@ -1,7 +1,8 @@
 """Local JSON file storage for trusted sources.
 
-Sources are stored in ``backend/data/trusted_sources.json`` as a list of
-source objects, each shaped like the sample data (see ``sample_sources.json``)::
+Sources are stored in ignored ``backend/data/trusted_sources.local.json`` as a
+list of source objects, each shaped like the sample data
+(see ``sample_sources.json``)::
 
     {
         "id": "source_...",
@@ -20,14 +21,19 @@ from pathlib import Path
 from typing import Any
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
-TRUSTED_SOURCES_PATH = DATA_DIR / "trusted_sources.json"
+TRUSTED_SOURCES_SEED_PATH = DATA_DIR / "trusted_sources.json"
+TRUSTED_SOURCES_PATH = DATA_DIR / "trusted_sources.local.json"
 SAMPLE_SOURCES_PATH = DATA_DIR / "sample_sources.json"
 
 
 def _ensure_files() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     if not TRUSTED_SOURCES_PATH.exists():
-        TRUSTED_SOURCES_PATH.write_text("[]", encoding="utf-8")
+        seed_sources = _read_json_list(TRUSTED_SOURCES_SEED_PATH)
+        TRUSTED_SOURCES_PATH.write_text(
+            json.dumps(seed_sources, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
 
 def _read_json_list(path: Path) -> list[dict[str, Any]]:
