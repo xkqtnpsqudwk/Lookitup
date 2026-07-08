@@ -6,7 +6,7 @@ Each item is a dict: ``{"title", "url", "timestamp", "content"}``.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from email.utils import parsedate_to_datetime
 from typing import Any
 
@@ -55,7 +55,45 @@ def normalize_timestamp(value: Any) -> str | None:
     return parsed.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
-def extract_rss(url: str, limit: int = 12) -> list[dict[str, Any]]:
+def _parse_date(value: str) -> date | None:
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
+def _item_date(timestamp_iso: str | None) -> date | None:
+    if not timestamp_iso:
+        return None
+    try:
+        return datetime.fromisoformat(timestamp_iso.replace("Z", "+00:00")).date()
+    except ValueError:
+        return None
+
+
+def _in_range(timestamp_iso: str | None, start: date | None, end: date | None) -> bool:
+    if start is None and end is None:
+        return True
+    item_day = _item_date(timestamp_iso)
+    if item_day is None:
+        # A date range was requested but this item has no usable date — exclude it.
+        return False
+    if start and item_day < start:
+        return False
+    if end and item_day > end:
+        return False
+    return True
+
+
+def extract_rss(
+    url: str,
+    date_from: str = "",
+    date_to: str = "",
+    limit: int = 50,
+) -> list[dict[str, Any]]:
     if not url.strip():
         raise ExtractionError("An RSS source needs a feed URL.")
     feed = feedparser.parse(url)
@@ -66,21 +104,36 @@ def extract_rss(url: str, limit: int = 12) -> list[dict[str, Any]]:
     if not feed.entries:
         raise ExtractionError("No entries were found in this RSS feed.")
 
+    start = _parse_date(date_from)
+    end = _parse_date(date_to)
+    if start and end and start > end:
+        raise ExtractionError("The 'from' date is after the 'to' date.")
+
     items: list[dict[str, Any]] = []
-    for entry in feed.entries[:limit]:
+    for entry in feed.entries:
+        if len(items) >= limit:
+            break
+        published = entry.get("published") or entry.get("updated") or entry.get("created")
+        timestamp = normalize_timestamp(published)
+        if not _in_range(timestamp, start, end):
+            continue
         title = html_to_text(entry.get("title", "Untitled RSS item")) or "Untitled RSS item"
         parts = [entry.get("summary", ""), entry.get("description", "")]
         for content in entry.get("content", []) or []:
             parts.append(content.get("value", ""))
         body = html_to_text(" ".join(parts))
-        published = entry.get("published") or entry.get("updated") or entry.get("created")
         items.append(
             {
                 "title": title,
                 "url": entry.get("link", url),
-                "timestamp": normalize_timestamp(published),
+                "timestamp": timestamp,
                 "content": body or title,
             }
+        )
+
+    if not items:
+        raise ExtractionError(
+            "No RSS items fell within that date range. Try widening the dates."
         )
     return items
 

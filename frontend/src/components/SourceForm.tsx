@@ -12,6 +12,8 @@ export default function SourceForm({ onAdd, onAddPdf, busy }: SourceFormProps) {
   const [type, setType] = useState<SourceType>("rss");
   const [url, setUrl] = useState("");
   const [content, setContent] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileKey, setFileKey] = useState(0);
   const [localError, setLocalError] = useState("");
@@ -20,6 +22,8 @@ export default function SourceForm({ onAdd, onAddPdf, busy }: SourceFormProps) {
     setName("");
     setUrl("");
     setContent("");
+    setDateFrom("");
+    setDateTo("");
     setFile(null);
     setFileKey((key) => key + 1);
   }
@@ -51,12 +55,18 @@ export default function SourceForm({ onAdd, onAddPdf, busy }: SourceFormProps) {
         setLocalError("Manual text cannot be empty.");
         return;
       }
+      if (type === "rss" && dateFrom && dateTo && dateFrom > dateTo) {
+        setLocalError("The 'from' date is after the 'to' date.");
+        return;
+      }
 
       await onAdd({
         name: name.trim(),
         type: type as CreatableType,
         url: url.trim(),
         content: content.trim(),
+        date_from: type === "rss" ? dateFrom : "",
+        date_to: type === "rss" ? dateTo : "",
       });
       reset();
     } catch (err) {
@@ -118,6 +128,19 @@ export default function SourceForm({ onAdd, onAddPdf, busy }: SourceFormProps) {
             placeholder="https://example.com/rss"
           />
         </label>
+      )}
+
+      {type === "rss" && (
+        <div className="dateRange">
+          <label>
+            From (optional)
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+          </label>
+          <label>
+            To (optional)
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+          </label>
+        </div>
       )}
 
       {localError && <p className="formError">{localError}</p>}

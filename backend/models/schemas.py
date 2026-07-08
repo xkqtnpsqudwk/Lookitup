@@ -24,6 +24,9 @@ class SourceCreate(BaseModel):
     type: CreatableType
     url: str = Field(default="", description="RSS or website URL.")
     content: str = Field(default="", description="Raw text for a manual source.")
+    # RSS only: keep feed items published within this date range (YYYY-MM-DD).
+    date_from: str = Field(default="", description="RSS: only items on/after this date.")
+    date_to: str = Field(default="", description="RSS: only items on/before this date.")
 
 
 class SourceItem(BaseModel):

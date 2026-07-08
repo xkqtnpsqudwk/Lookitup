@@ -204,6 +204,20 @@ textarea:focus {
   margin: 0;
 }
 
+.dateRange {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: 1fr 1fr;
+}
+
+.dateRange label {
+  color: #0f172a;
+  display: grid;
+  font-size: 0.85rem;
+  font-weight: 700;
+  gap: 0.3rem;
+}
+
 .sourceActions {
   display: flex;
   flex-wrap: wrap;

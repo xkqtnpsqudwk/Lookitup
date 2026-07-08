@@ -19,6 +19,8 @@ export interface SourceCreate {
   type: CreatableType;
   url?: string;
   content?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface SearchResult {

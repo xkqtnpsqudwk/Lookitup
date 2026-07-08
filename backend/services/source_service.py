@@ -58,7 +58,7 @@ def add_source(payload: SourceCreate) -> SourceOut:
 
     try:
         if payload.type == "rss":
-            items = extractor_service.extract_rss(payload.url)
+            items = extractor_service.extract_rss(payload.url, payload.date_from, payload.date_to)
         elif payload.type == "website":
             items = extractor_service.extract_website(payload.url)
         elif payload.type == "manual":
