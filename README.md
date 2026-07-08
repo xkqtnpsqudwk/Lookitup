@@ -78,6 +78,18 @@ npm run dev
 The app runs at `http://localhost:5173` and calls the backend at
 `http://localhost:8000`. Override with a `VITE_API_BASE_URL` env var if needed.
 
+**Android app:**
+
+```bash
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Then open `android/` in Android Studio and run the `app` configuration. The emulator
+uses `http://10.0.2.2:8000/` by default. For a real phone, pass
+`-PLOOKITUP_API_BASE_URL=http://YOUR_PC_LAN_IP:8000/` in the Android Studio run
+configuration.
+
 ## Demo query
 
 1. Click **Load sample sources**.
