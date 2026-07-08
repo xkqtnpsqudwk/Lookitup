@@ -76,13 +76,6 @@ http://localhost:5173
 
 The React app calls the FastAPI backend at `http://127.0.0.1:8000`.
 
-Legacy Streamlit prototype:
-
-
-```bash
-python -m streamlit run app.py
-```
-
 The app runs locally and stores added sources in `data/trusted_sources.json`.
 
 ## Backend API
@@ -144,7 +137,7 @@ If no key is available, Lookitup falls back to an extractive summary with Eviden
 
 ## Limitations
 
-- This branch keeps the existing Streamlit app instead of rebuilding the frontend in Next.js.
+- This branch uses React + Vite instead of the originally recommended Next.js frontend.
 - The SQLite FTS5 index is built locally from the selected pack corpus at runtime.
 - Mismatch detection is deterministic and lightweight for the demo case.
 - Website extraction may fail on pages that block requests or render content with JavaScript.
