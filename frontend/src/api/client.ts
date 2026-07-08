@@ -3,6 +3,8 @@ import type {
   SortOption,
   Source,
   SourceCreate,
+  SummaryResponse,
+  SummaryStyle,
 } from "../types";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
@@ -86,5 +88,10 @@ export const api = {
   search: (query: string, sort: SortOption) =>
     request<SearchResponse>(
       `/search?q=${encodeURIComponent(query)}&sort=${sort}`,
+    ),
+
+  summarize: (query: string, sort: SortOption, style: SummaryStyle) =>
+    request<SummaryResponse>(
+      `/summarize?q=${encodeURIComponent(query)}&sort=${sort}&style=${style}`,
     ),
 };

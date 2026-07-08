@@ -41,3 +41,15 @@ export interface SearchResponse {
   count: number;
   results: SearchResult[];
 }
+
+export type SummaryStyle = "paragraph" | "bullets";
+
+export interface SummaryResponse {
+  query: string;
+  summary: string;
+  model: string;
+  style: SummaryStyle;
+  used_sources: string[];
+  based_on: number;
+  grounded_in: number;
+}

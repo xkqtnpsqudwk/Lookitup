@@ -367,6 +367,70 @@ textarea:focus {
   color: #92400e;
 }
 
+/* ---------- AI summary ---------- */
+.summaryBox {
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 10px;
+  margin-bottom: 0.85rem;
+  padding: 0.9rem 1rem;
+}
+
+.summaryHead {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: space-between;
+}
+
+.summaryNote {
+  color: #0f766e;
+  font-size: 0.82rem;
+}
+
+.summaryControls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.summaryControls select {
+  width: auto;
+}
+
+.summaryBody {
+  margin-top: 0.8rem;
+}
+
+.summaryBody p {
+  color: #134e4a;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.summaryBody ul {
+  color: #134e4a;
+  line-height: 1.6;
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.summaryMeta {
+  color: #0f766e !important;
+  font-size: 0.78rem;
+  margin-top: 0.7rem !important;
+}
+
+.summaryError {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 0.86rem;
+  margin: 0.8rem 0 0;
+  padding: 0.7rem 0.85rem;
+}
+
 /* ---------- Result cards ---------- */
 .cards {
   display: grid;

@@ -4,7 +4,15 @@ import ResultCard from "../components/ResultCard";
 import SearchBar from "../components/SearchBar";
 import SourceForm from "../components/SourceForm";
 import SourceList from "../components/SourceList";
-import type { SearchResponse, SortOption, Source, SourceCreate } from "../types";
+import SummaryPanel from "../components/SummaryPanel";
+import type {
+  SearchResponse,
+  SortOption,
+  Source,
+  SourceCreate,
+  SummaryResponse,
+  SummaryStyle,
+} from "../types";
 
 const NO_RESULTS_TEXT =
   "No result found does not mean the claim is false. It only means Lookitup could not find it inside your selected trusted sources.";
@@ -20,6 +28,15 @@ export default function HomePage() {
   const [searchBusy, setSearchBusy] = useState(false);
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState("");
+  const [summary, setSummary] = useState<SummaryResponse | null>(null);
+  const [summaryStyle, setSummaryStyle] = useState<SummaryStyle>("paragraph");
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [summaryError, setSummaryError] = useState("");
+
+  function resetSummary() {
+    setSummary(null);
+    setSummaryError("");
+  }
 
   async function refreshSources() {
     try {
@@ -74,6 +91,7 @@ export default function HomePage() {
     try {
       await api.clearSources();
       setResult(null);
+      resetSummary();
       await refreshSources();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not clear sources.");
@@ -93,12 +111,26 @@ export default function HomePage() {
     }
     setSearchBusy(true);
     setError("");
+    resetSummary();
     try {
       setResult(await api.search(query, sort));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed.");
     } finally {
       setSearchBusy(false);
+    }
+  }
+
+  async function handleSummarize() {
+    setSummaryBusy(true);
+    setSummaryError("");
+    try {
+      setSummary(await api.summarize(query, sort, summaryStyle));
+    } catch (err) {
+      setSummary(null);
+      setSummaryError(err instanceof Error ? err.message : "Could not generate summary.");
+    } finally {
+      setSummaryBusy(false);
     }
   }
 
@@ -201,11 +233,21 @@ export default function HomePage() {
         )}
 
         {result && result.results.length > 0 && (
-          <div className="cards">
-            {result.results.map((item, index) => (
-              <ResultCard key={item.id} result={item} index={index} />
-            ))}
-          </div>
+          <>
+            <SummaryPanel
+              summary={summary}
+              busy={summaryBusy}
+              error={summaryError}
+              style={summaryStyle}
+              onStyleChange={setSummaryStyle}
+              onGenerate={handleSummarize}
+            />
+            <div className="cards">
+              {result.results.map((item, index) => (
+                <ResultCard key={item.id} result={item} index={index} />
+              ))}
+            </div>
+          </>
         )}
       </section>
     </>

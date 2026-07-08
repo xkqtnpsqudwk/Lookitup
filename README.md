@@ -96,6 +96,7 @@ POST   /sources/pdf            → add a PDF source (multipart file upload)
 DELETE /sources                → clear all sources (reset demo)
 POST   /sources/load-samples   → load backend/data/sample_sources.json
 GET    /search?q=...&sort=...  → search (sort: relevance | newest)
+GET    /summarize?q=...&style=  → optional AI summary of results (needs OPENAI_API_KEY)
 ```
 
 ## Limitations
@@ -111,10 +112,14 @@ GET    /search?q=...&sort=...  → search (sort: relevance | newest)
 
 ## Future extensions
 
-Treated as out of scope for this MVP, but natural next steps:
+Beyond the core MVP, Lookitup now also has an **optional AI summary** (OpenAI,
+generated only from the trusted results). Set `OPENAI_API_KEY` to enable it; without
+a key the app still works and the summary button shows a clear message.
 
-- Optional AI summary generated **from the trusted results only**.
+Still on the roadmap:
+
 - Image EXIF metadata tab and image flagging.
+- C2PA provenance/signature verification for uploaded images.
 - Archive.org article-version comparison.
 - OCR for scanned/image-only PDFs.
 - Source diversity indicator.

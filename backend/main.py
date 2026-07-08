@@ -9,16 +9,25 @@ Run with::
 
 from __future__ import annotations
 
-from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load backend/.env (e.g. OPENAI_API_KEY) before anything reads the environment.
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 from models.schemas import (
     SearchResponse,
     SortOption,
     SourceCreate,
     SourceOut,
+    SummaryResponse,
+    SummaryStyle,
 )
-from services import search_service, source_service
+from services import search_service, source_service, summary_service
 
 app = FastAPI(
     title="Lookitup Backend",
@@ -95,3 +104,20 @@ def search(
         raise HTTPException(status_code=400, detail="Search query cannot be empty.")
     results = search_service.search(q, sort)
     return SearchResponse(query=q, count=len(results), results=results)
+
+
+@app.get("/summarize", response_model=SummaryResponse)
+def summarize(
+    q: str = Query(default="", description="Search query to summarize."),
+    sort: SortOption = Query(default="relevance"),
+    style: SummaryStyle = Query(default="paragraph"),
+) -> SummaryResponse:
+    if not q.strip():
+        raise HTTPException(status_code=400, detail="Search query cannot be empty.")
+    results = search_service.search(q, sort)
+    try:
+        data = summary_service.generate_summary(q, results, style)
+    except summary_service.SummaryUnavailable as exc:
+        # 503: the feature is optional and unavailable (no key / no results / API error).
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return SummaryResponse(query=q, grounded_in=len(results), **data)

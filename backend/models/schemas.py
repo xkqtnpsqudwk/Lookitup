@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 SourceType = Literal["rss", "website", "manual", "pdf"]
 CreatableType = Literal["rss", "website", "manual"]
 SortOption = Literal["relevance", "newest"]
+SummaryStyle = Literal["paragraph", "bullets"]
 
 
 class SourceCreate(BaseModel):
@@ -60,3 +61,13 @@ class SearchResponse(BaseModel):
     query: str
     count: int
     results: list[SearchResult]
+
+
+class SummaryResponse(BaseModel):
+    query: str
+    summary: str
+    model: str
+    style: SummaryStyle
+    used_sources: list[str]
+    based_on: int
+    grounded_in: int
