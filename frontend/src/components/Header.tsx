@@ -10,7 +10,11 @@ export default function Header({ page, onNavigate }: HeaderProps) {
     <header className="hero">
       <div className="heroRow">
         <div>
-          <h1>Lookitup</h1>
+          <h1 className="brandTitle">
+            <span className="brandLogoBadge">
+              <img className="brandLogo" src="/lookitup.svg" alt="Lookitup" />
+            </span>
+          </h1>
           <p className="subtitle">Having a doubt? Just Lookitup.</p>
         </div>
         <nav className="nav">

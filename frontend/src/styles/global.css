@@ -54,10 +54,23 @@ main {
   justify-content: space-between;
 }
 
-.hero h1 {
-  font-size: 2.1rem;
-  line-height: 1.05;
+.brandTitle {
+  line-height: 0;
   margin: 0;
+}
+
+.brandLogoBadge {
+  align-items: center;
+  background: #0f766e;
+  border-radius: 8px;
+  display: inline-flex;
+  padding: 0.48rem 0.58rem;
+}
+
+.brandLogo {
+  display: block;
+  height: 34px;
+  width: 141px;
 }
 
 .subtitle {
