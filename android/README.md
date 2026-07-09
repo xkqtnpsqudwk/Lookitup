@@ -6,12 +6,11 @@ Native Android client for the Lookitup FastAPI backend.
 
 - View trusted sources.
 - Load sample sources.
-- Add manual, RSS, or website sources.
+- Add manual, RSS, website, or PDF sources.
+- Filter RSS ingestion by optional date range.
 - Search a topic inside trusted sources.
 - Review Trusted Result Cards.
 - Generate an optional grounded summary from current results.
-
-PDF upload is intentionally left for a follow-up pass because it needs Android file picker and multipart upload UI.
 
 ## Run With Android Studio
 
@@ -42,10 +41,23 @@ In Android Studio, add this Gradle property to the run configuration:
 If Gradle is installed on your machine, the equivalent command is:
 
 ```bash
-gradle :app:installDebug -PLOOKITUP_API_BASE_URL=http://192.168.x.x:8000/
+./gradlew :app:installDebug -PLOOKITUP_API_BASE_URL=http://192.168.x.x:8000/
 ```
 
 The phone and the computer must be on the same network, and the backend must be started with `--host 0.0.0.0`.
+
+## Demo With Web Frontend
+
+Use one backend for both the browser and Android:
+
+```text
+FastAPI backend  http://localhost:8000
+Web frontend     http://localhost:5173
+Android emulator http://10.0.2.2:8000 -> same backend
+```
+
+Start the backend first, then run the web frontend from `frontend/` with
+`npm run dev`, and finally launch the Android app on the emulator.
 
 ## Project Shape
 

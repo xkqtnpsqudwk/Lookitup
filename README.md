@@ -93,6 +93,32 @@ uses `http://10.0.2.2:8000/` by default. For a real phone, pass
 `-PLOOKITUP_API_BASE_URL=http://YOUR_PC_LAN_IP:8000/` in the Android Studio run
 configuration.
 
+### Demo Web And Android Together
+
+Run one backend and let both clients share it:
+
+```text
+FastAPI backend  http://localhost:8000
+Web frontend     http://localhost:5173
+Android emulator http://10.0.2.2:8000 -> same backend
+```
+
+Use three terminals/windows:
+
+```bash
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+```bash
+cd frontend
+npm run dev
+```
+
+Then run the Android app on the emulator from Android Studio. The web app and
+Android app will read/write the same trusted sources through the backend on port
+8000.
+
 ## Demo query
 
 1. Click **Load sample sources**.
